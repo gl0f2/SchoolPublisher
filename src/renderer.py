@@ -9,7 +9,7 @@ from pathlib import Path
 from string import Template
 from urllib.parse import quote
 
-from models import Lehrkraft, Schule, Unterricht
+from models import Bewertungsinfo, Lehrkraft, Schule, Unterricht
 
 
 def wochenstunden_text(
@@ -323,8 +323,12 @@ class ElternabendHtmlRenderer:
             for lehrkraft in lehrkraefte
         )
 
-        stunden_text = self._wochenstunden_gruppe_text(
-            eintraege
+        bewertung = schule.bewertung_fuer_fach(
+            fachname
+        )
+
+        bewertung_html = self._bewertung_html(
+            bewertung
         )
 
         return f"""
@@ -341,11 +345,107 @@ class ElternabendHtmlRenderer:
                 {namen_html}
             </p>
 
-            <p class="wochenstunden">
-                {escape(stunden_text)}
-            </p>
+            {bewertung_html}
         </article>
         """
+
+    @staticmethod
+    def _bewertung_html(
+        bewertung: Bewertungsinfo,
+    ) -> str:
+        erhebungen = bewertung.leistungserhebungen()
+
+        if erhebungen:
+            erhebungen_html = "".join(
+                ElternabendHtmlRenderer._leistungserhebung_html(
+                    bezeichnung=bezeichnung,
+                    anzahl=anzahl,
+                )
+                for bezeichnung, anzahl in erhebungen
+            )
+        else:
+            erhebungen_html = (
+                '<p style="margin: 4px 0 0;">'
+                "Keine festen Angaben"
+                "</p>"
+            )
+
+        return f"""
+            <section
+                class="bewertungsinfo"
+                style="
+                    margin-top: 14px;
+                    padding-top: 12px;
+                    border-top: 1px solid #d9e2e8;
+                "
+            >
+                <p
+                    style="
+                        margin: 0 0 5px;
+                        font-size: 0.78rem;
+                        font-weight: bold;
+                        letter-spacing: 0.04em;
+                        text-transform: uppercase;
+                    "
+                >
+                    Bewertung
+                </p>
+
+                <p style="margin: 0;">
+                    {escape(bewertung.bezeichnung)}
+                </p>
+
+                <p
+                    style="
+                        margin: 3px 0 12px;
+                        font-size: 1.2rem;
+                        font-weight: bold;
+                    "
+                >
+                    {escape(bewertung.verhaeltnis)}
+                </p>
+
+                <p
+                    style="
+                        margin: 0 0 5px;
+                        font-size: 0.78rem;
+                        font-weight: bold;
+                        letter-spacing: 0.04em;
+                        text-transform: uppercase;
+                    "
+                >
+                    Leistungserhebungen
+                </p>
+
+                <div class="leistungserhebungen">
+                    {erhebungen_html}
+                </div>
+            </section>
+        """
+
+    @staticmethod
+    def _leistungserhebung_html(
+        bezeichnung: str,
+        anzahl: int,
+    ) -> str:
+        singularformen = {
+            "Klassenarbeiten": "Klassenarbeit",
+            "Tests": "Test",
+            "Projekte": "Projekt",
+            "Sonstige": "Sonstige",
+        }
+
+        text = (
+            singularformen.get(bezeichnung, bezeichnung)
+            if anzahl == 1
+            else bezeichnung
+        )
+
+        return (
+            '<p style="margin: 4px 0 0;">'
+            f"{anzahl} {escape(text)}"
+            "</p>"
+        )
 
     @staticmethod
     def _eindeutige_lehrkraefte(

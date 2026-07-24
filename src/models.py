@@ -8,6 +8,89 @@ from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
+class Bewertungsinfo:
+    """Bewertung und Leistungserhebungen eines Fachs."""
+
+    bereich_links: str = "Mündlich"
+    bereich_rechts: str = "Schriftlich"
+    gewicht_links: int = 2
+    gewicht_rechts: int = 1
+    klassenarbeiten: int = 4
+    tests: int = 2
+    projekte: int = 1
+    sonstige: int = 0
+
+    @property
+    def bezeichnung(self) -> str:
+        return f"{self.bereich_links} : {self.bereich_rechts}"
+
+    @property
+    def verhaeltnis(self) -> str:
+        return f"{self.gewicht_links} : {self.gewicht_rechts}"
+
+    def leistungserhebungen(self) -> list[tuple[str, int]]:
+        erhebungen = [
+            ("Klassenarbeiten", self.klassenarbeiten),
+            ("Tests", self.tests),
+            ("Projekte", self.projekte),
+            ("Sonstige", self.sonstige),
+        ]
+        return [
+            (bezeichnung, anzahl)
+            for bezeichnung, anzahl in erhebungen
+            if anzahl > 0
+        ]
+
+
+@dataclass
+class Bewertungskatalog:
+    """Zentrale Standardbewertungen für die Fächer."""
+
+    standard: Bewertungsinfo = field(default_factory=Bewertungsinfo)
+    fachwerte: dict[str, Bewertungsinfo] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.fachwerte = {
+            fachname.strip().casefold(): bewertung
+            for fachname, bewertung in self.fachwerte.items()
+            if fachname.strip()
+        }
+
+    def fuer_fach(self, fachname: str) -> Bewertungsinfo:
+        return self.fachwerte.get(
+            fachname.strip().casefold(),
+            self.standard,
+        )
+
+    @classmethod
+    def mit_standardwerten(cls) -> "Bewertungskatalog":
+        return cls(
+            standard=Bewertungsinfo(
+                bereich_links="Mündlich",
+                bereich_rechts="Schriftlich",
+                gewicht_links=2,
+                gewicht_rechts=1,
+                klassenarbeiten=4,
+                tests=2,
+                projekte=1,
+                sonstige=0,
+            ),
+            fachwerte={
+                "Sport": Bewertungsinfo(
+                    bereich_links="Mündlich",
+                    bereich_rechts="Praktisch",
+                    gewicht_links=1,
+                    gewicht_rechts=2,
+                    klassenarbeiten=0,
+                    tests=0,
+                    projekte=0,
+                    sonstige=0,
+                ),
+            },
+        )
+
+
+@dataclass(frozen=True)
 class Unterricht:
     """Ein Unterrichtseintrag aus der ASV-Matrix."""
 
@@ -80,6 +163,9 @@ class Schule:
 
     unterricht: list[Unterricht]
     lehrkraeftekatalog: dict[str, Lehrkraft] = field(default_factory=dict)
+    bewertungskatalog: Bewertungskatalog = field(
+        default_factory=Bewertungskatalog.mit_standardwerten
+    )
 
     _klassen: tuple[str, ...] = field(init=False, repr=False)
     _lehrkraefte: tuple[str, ...] = field(init=False, repr=False)
@@ -169,3 +255,6 @@ class Schule:
             if name.casefold() == gesucht:
                 return Fach(name=name)
         return None
+
+    def bewertung_fuer_fach(self, fachname: str) -> Bewertungsinfo:
+        return self.bewertungskatalog.fuer_fach(fachname)
