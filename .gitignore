@@ -1,0 +1,20 @@
+# Virtuelle Umgebung
+SchoolPublisher/.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# PyCharm
+.idea/
+
+# Ausgaben
+output/
+
+# Temporäre Dateien
+*.log
+*.tmp
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
