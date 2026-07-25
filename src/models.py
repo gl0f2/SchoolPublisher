@@ -1,24 +1,26 @@
-"""
-Datenmodelle für SchoolPublisher.
-"""
-
+"""Datenmodelle für SchoolPublisher."""
 from __future__ import annotations
-
 from dataclasses import dataclass, field
+import json
+from pathlib import Path
 
+@dataclass(frozen=True)
+class Leistungserhebung:
+    bezeichnung: str
+    anzahl: int
+    gewicht: float | None = None
+
+    @property
+    def vorhanden(self) -> bool:
+        return bool(self.bezeichnung.strip()) and self.anzahl > 0
 
 @dataclass(frozen=True)
 class Bewertungsinfo:
-    """Bewertung und Leistungserhebungen eines Fachs."""
-
     bereich_links: str = "Mündlich"
     bereich_rechts: str = "Schriftlich"
-    gewicht_links: int = 2
-    gewicht_rechts: int = 1
-    klassenarbeiten: int = 4
-    tests: int = 2
-    projekte: int = 1
-    sonstige: int = 0
+    gewicht_links: float = 2
+    gewicht_rechts: float = 1
+    erhebungen: tuple[Leistungserhebung, ...] = ()
 
     @property
     def bezeichnung(self) -> str:
@@ -26,74 +28,69 @@ class Bewertungsinfo:
 
     @property
     def verhaeltnis(self) -> str:
-        return f"{self.gewicht_links} : {self.gewicht_rechts}"
+        return f"{zahl_text(self.gewicht_links)} : {zahl_text(self.gewicht_rechts)}"
 
-    def leistungserhebungen(self) -> list[tuple[str, int]]:
-        erhebungen = [
-            ("Klassenarbeiten", self.klassenarbeiten),
-            ("Tests", self.tests),
-            ("Projekte", self.projekte),
-            ("Sonstige", self.sonstige),
-        ]
-        return [
-            (bezeichnung, anzahl)
-            for bezeichnung, anzahl in erhebungen
-            if anzahl > 0
-        ]
+    def vorhandene_erhebungen(self) -> list[Leistungserhebung]:
+        return [e for e in self.erhebungen if e.vorhanden]
 
+    def gewichtete_erhebungen(self) -> list[Leistungserhebung]:
+        return [e for e in self.vorhandene_erhebungen() if e.gewicht is not None and e.gewicht > 0]
 
 @dataclass
 class Bewertungskatalog:
-    """Zentrale Standardbewertungen für die Fächer."""
-
-    standard: Bewertungsinfo = field(default_factory=Bewertungsinfo)
     fachwerte: dict[str, Bewertungsinfo] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        self.fachwerte = {
-            fachname.strip().casefold(): bewertung
-            for fachname, bewertung in self.fachwerte.items()
-            if fachname.strip()
-        }
+        self.fachwerte = {k.strip().casefold(): v for k, v in self.fachwerte.items() if k.strip()}
 
-    def fuer_fach(self, fachname: str) -> Bewertungsinfo:
-        return self.fachwerte.get(
-            fachname.strip().casefold(),
-            self.standard,
-        )
+    def fuer_fach(self, fachname: str) -> Bewertungsinfo | None:
+        return self.fachwerte.get(fachname.strip().casefold())
 
     @classmethod
-    def mit_standardwerten(cls) -> "Bewertungskatalog":
-        return cls(
-            standard=Bewertungsinfo(
-                bereich_links="Mündlich",
-                bereich_rechts="Schriftlich",
-                gewicht_links=2,
-                gewicht_rechts=1,
-                klassenarbeiten=4,
-                tests=2,
-                projekte=1,
-                sonstige=0,
-            ),
-            fachwerte={
-                "Sport": Bewertungsinfo(
-                    bereich_links="Mündlich",
-                    bereich_rechts="Praktisch",
-                    gewicht_links=1,
-                    gewicht_rechts=2,
-                    klassenarbeiten=0,
-                    tests=0,
-                    projekte=0,
-                    sonstige=0,
-                ),
-            },
-        )
+    def aus_json(cls, pfad: Path) -> "Bewertungskatalog":
+        if not pfad.is_file():
+            return cls()
+        daten = json.loads(pfad.read_text(encoding="utf-8"))
+        fachwerte = {}
+        for fachname, fach in daten.get("faecher", {}).items():
+            erhebungen = tuple(
+                Leistungserhebung(
+                    bezeichnung=str(e.get("bezeichnung", "")).strip(),
+                    anzahl=max(0, int(e.get("anzahl", 0) or 0)),
+                    gewicht=positive_zahl_oder_none(e.get("gewicht")),
+                )
+                for e in fach.get("leistungserhebungen", [])
+            )
+            fachwerte[fachname] = Bewertungsinfo(
+                bereich_links=str(fach.get("bereich_links", "Mündlich")).strip() or "Mündlich",
+                bereich_rechts=str(fach.get("bereich_rechts", "Schriftlich")).strip() or "Schriftlich",
+                gewicht_links=positive_zahl(fach.get("gewicht_links", 2), 2),
+                gewicht_rechts=positive_zahl(fach.get("gewicht_rechts", 1), 1),
+                erhebungen=erhebungen,
+            )
+        return cls(fachwerte=fachwerte)
 
+def positive_zahl(wert: object, standard: float) -> float:
+    try:
+        zahl = float(str(wert).strip().replace(",", "."))
+        return zahl if zahl > 0 else standard
+    except (TypeError, ValueError):
+        return standard
+
+def positive_zahl_oder_none(wert: object) -> float | None:
+    if wert in (None, ""):
+        return None
+    try:
+        zahl = float(str(wert).strip().replace(",", "."))
+        return zahl if zahl > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+def zahl_text(wert: float) -> str:
+    return f"{wert:g}"
 
 @dataclass(frozen=True)
 class Unterricht:
-    """Ein Unterrichtseintrag aus der ASV-Matrix."""
-
     klasse: str
     fach: str
     fachname: str
@@ -101,160 +98,60 @@ class Unterricht:
     wochenstunden: float
     stundenplan_name: str = ""
     kopplung: str | None = None
-
     @property
     def anzeigename(self) -> str:
-        return (
-            self.fachname.strip()
-            or self.stundenplan_name.strip()
-            or self.fach.strip()
-        )
-
+        return self.fachname.strip() or self.stundenplan_name.strip() or self.fach.strip()
 
 @dataclass(frozen=True)
 class Lehrkraft:
-    """Stammdaten einer Lehrkraft."""
-
     kuerzel: str
     anrede: str = ""
     vorname: str = ""
     nachname: str = ""
     email: str = ""
     foto: str = ""
-
     @property
     def voller_name(self) -> str:
-        teile = [
-            self.anrede.strip(),
-            self.vorname.strip(),
-            self.nachname.strip(),
-        ]
-        return " ".join(teil for teil in teile if teil)
-
+        return " ".join(x for x in (self.anrede.strip(), self.vorname.strip(), self.nachname.strip()) if x)
     @property
     def kurzer_name(self) -> str:
-        teile = [
-            self.anrede.strip(),
-            self.nachname.strip(),
-        ]
-        name = " ".join(teil for teil in teile if teil)
-        return name or self.voller_name or self.kuerzel
-
+        return " ".join(x for x in (self.anrede.strip(), self.nachname.strip()) if x) or self.voller_name or self.kuerzel
     @property
     def anzeigename(self) -> str:
         return self.voller_name or self.kuerzel
-
 
 @dataclass(frozen=True)
 class Klasse:
     name: str
     klassenlehrer: tuple[str, ...] = ()
 
-
 @dataclass(frozen=True)
 class Fach:
     name: str
     kuerzel: str = ""
 
-
 @dataclass
 class Schule:
-    """Zentrales Schulmodell."""
-
     unterricht: list[Unterricht]
     lehrkraeftekatalog: dict[str, Lehrkraft] = field(default_factory=dict)
-    bewertungskatalog: Bewertungskatalog = field(
-        default_factory=Bewertungskatalog.mit_standardwerten
-    )
-
+    bewertungskatalog: Bewertungskatalog = field(default_factory=Bewertungskatalog)
     _klassen: tuple[str, ...] = field(init=False, repr=False)
     _lehrkraefte: tuple[str, ...] = field(init=False, repr=False)
     _faecher: tuple[str, ...] = field(init=False, repr=False)
-
     def __post_init__(self) -> None:
-        self._klassen = tuple(
-            sorted(
-                {
-                    eintrag.klasse.strip()
-                    for eintrag in self.unterricht
-                    if eintrag.klasse.strip()
-                },
-                key=str.casefold,
-            )
-        )
-
-        self._lehrkraefte = tuple(
-            sorted(
-                {
-                    eintrag.lehrer.strip()
-                    for eintrag in self.unterricht
-                    if eintrag.lehrer.strip()
-                },
-                key=str.casefold,
-            )
-        )
-
-        self._faecher = tuple(
-            sorted(
-                {
-                    eintrag.anzeigename
-                    for eintrag in self.unterricht
-                    if eintrag.anzeigename
-                },
-                key=str.casefold,
-            )
-        )
-
-        self.lehrkraeftekatalog = {
-            kuerzel.strip().casefold(): lehrkraft
-            for kuerzel, lehrkraft in self.lehrkraeftekatalog.items()
-        }
-
-    def klassen(self) -> list[str]:
-        return list(self._klassen)
-
-    def lehrkraefte(self) -> list[str]:
-        return list(self._lehrkraefte)
-
-    def faecher(self) -> list[str]:
-        return list(self._faecher)
-
-    def unterricht_der_klasse(self, klassenname: str) -> list[Unterricht]:
-        gesucht = klassenname.strip().casefold()
-        return [
-            eintrag
-            for eintrag in self.unterricht
-            if eintrag.klasse.strip().casefold() == gesucht
-        ]
-
-    def unterricht_der_lehrkraft(self, lehrerkuerzel: str) -> list[Unterricht]:
-        gesucht = lehrerkuerzel.strip().casefold()
-        return [
-            eintrag
-            for eintrag in self.unterricht
-            if eintrag.lehrer.strip().casefold() == gesucht
-        ]
-
-    def klasse(self, klassenname: str) -> Klasse | None:
-        gesucht = klassenname.strip().casefold()
-        for name in self._klassen:
-            if name.casefold() == gesucht:
-                return Klasse(name=name)
-        return None
-
-    def lehrkraft(self, lehrerkuerzel: str) -> Lehrkraft:
-        kuerzel = lehrerkuerzel.strip()
-        return self.lehrkraeftekatalog.get(
-            kuerzel.casefold(),
-            Lehrkraft(kuerzel=kuerzel),
-        )
-
-    def fach(self, fachname: str) -> Fach | None:
-        gesucht = fachname.strip().casefold()
-        for name in self._faecher:
-            if name.casefold() == gesucht:
-                return Fach(name=name)
-        return None
-
-    def bewertung_fuer_fach(self, fachname: str) -> Bewertungsinfo:
-        return self.bewertungskatalog.fuer_fach(fachname)
+        self._klassen = tuple(sorted({e.klasse.strip() for e in self.unterricht if e.klasse.strip()}, key=str.casefold))
+        self._lehrkraefte = tuple(sorted({e.lehrer.strip() for e in self.unterricht if e.lehrer.strip()}, key=str.casefold))
+        self._faecher = tuple(sorted({e.anzeigename for e in self.unterricht if e.anzeigename}, key=str.casefold))
+        self.lehrkraeftekatalog = {k.strip().casefold(): v for k, v in self.lehrkraeftekatalog.items()}
+    def klassen(self): return list(self._klassen)
+    def lehrkraefte(self): return list(self._lehrkraefte)
+    def faecher(self): return list(self._faecher)
+    def unterricht_der_klasse(self, name): return [e for e in self.unterricht if e.klasse.strip().casefold() == name.strip().casefold()]
+    def unterricht_der_lehrkraft(self, k): return [e for e in self.unterricht if e.lehrer.strip().casefold() == k.strip().casefold()]
+    def klasse(self, name):
+        return next((Klasse(n) for n in self._klassen if n.casefold() == name.strip().casefold()), None)
+    def lehrkraft(self, k):
+        return self.lehrkraeftekatalog.get(k.strip().casefold(), Lehrkraft(kuerzel=k.strip()))
+    def fach(self, name):
+        return next((Fach(n) for n in self._faecher if n.casefold() == name.strip().casefold()), None)
+    def bewertung_fuer_fach(self, name): return self.bewertungskatalog.fuer_fach(name)

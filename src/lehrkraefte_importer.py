@@ -15,8 +15,11 @@ class LehrkraefteImporter:
     """
     Liest die vorhandene Excel-Stammdatendatei ein.
 
-    Liest Kürzel, Vorname, Nachname, Anrede, E-Mail und Foto
-    unverändert aus der Lehrkräftedatei ein.
+    Besonderheit der aktuellen Quelldatei:
+    Unter der Überschrift "Nachname" stehen die Vornamen,
+    unter "Vorname" stehen die Nachnamen.
+
+    Diese Vertauschung wird hier bewusst korrigiert.
     """
 
     BENOETIGTE_SPALTEN = {
@@ -86,6 +89,8 @@ class LehrkraefteImporter:
                     f"(zuletzt in Excel-Zeile {excel_zeile})."
                 )
 
+            # In der vorliegenden Datei sind diese beiden
+            # Spaltenüberschriften inhaltlich vertauscht.
             vorname = self._text(
                 zeile["Vorname"]
             )

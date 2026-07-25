@@ -44,13 +44,36 @@ class MatrixImporter:
                 lehrer=self._text_oder_leer(row.get("Lehrer")),
                 fachname=self._text_oder_leer(row.get("Fachname")),
                 stundenplan_name=stundenplan_name,
-                wochenstunden=float(row.get("Wochenstunden", 0)),
+                wochenstunden=self._zahl_oder_null(row.get("Wochenstunden", 0)),
                 kopplung=kopplung,
             )
 
             unterrichtsliste.append(eintrag)
 
         return unterrichtsliste
+
+
+    @staticmethod
+    def _zahl_oder_null(wert) -> float:
+        """Liest Zahlen aus Excel robust ein, auch mit deutschem Dezimalkomma."""
+        if pd.isna(wert) or wert == "":
+            return 0.0
+
+        if isinstance(wert, (int, float)):
+            return float(wert)
+
+        text = str(wert).strip().replace("\u00a0", "").replace(" ", "")
+
+        # Deutsche Schreibweise: 1.234,5 -> 1234.5
+        if "," in text:
+            text = text.replace(".", "").replace(",", ".")
+
+        try:
+            return float(text)
+        except ValueError as exc:
+            raise ValueError(
+                f"Ungültige Zahl in der Spalte 'Wochenstunden': {wert!r}"
+            ) from exc
 
     @staticmethod
     def _text_oder_leer(wert) -> str:

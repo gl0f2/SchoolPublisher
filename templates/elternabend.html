@@ -2,10 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Informationsblatt Klasse $KLASSE</title>
 
     <style>
@@ -20,53 +17,54 @@
             --weiss: #ffffff;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
+
+        html, body { margin: 0; padding: 0; }
 
         body {
-            margin: 0;
             font-family: Arial, Helvetica, sans-serif;
             background: var(--hintergrund);
             color: var(--text);
         }
 
+        /* Exakt eine DIN-A4-Seite. */
         .seite {
+            display: flex;
             width: 210mm;
-            min-height: 297mm;
-            margin: 20px auto;
-            padding: 17mm;
+            height: 297mm;
+            margin: 12px auto;
+            padding: 7mm;
+            flex-direction: column;
+            overflow: hidden;
             background: var(--weiss);
             box-shadow: 0 5px 24px rgba(0, 0, 0, 0.14);
         }
 
         .kopfbereich {
             position: relative;
+            height: 22mm;
+            flex: 0 0 22mm;
             overflow: hidden;
-            padding: 22px 26px;
+            padding: 3.2mm 5mm;
             color: var(--weiss);
-            border-radius: 15px;
-            background: linear-gradient(
-                135deg,
-                var(--dunkelblau),
-                var(--mittelblau)
-            );
+            border-radius: 3mm;
+            background: linear-gradient(135deg, var(--dunkelblau), var(--mittelblau));
         }
 
         .kopfbereich::after {
             position: absolute;
-            top: -55px;
-            right: -55px;
-            width: 180px;
-            height: 180px;
+            top: -18mm;
+            right: -12mm;
+            width: 45mm;
+            height: 45mm;
             content: "";
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.08);
         }
 
         .dokumentart {
-            margin: 0 0 7px;
-            font-size: 0.78rem;
+            margin: 0 0 1mm;
+            font-size: 6.4pt;
             font-weight: bold;
             letter-spacing: 0.14em;
             text-transform: uppercase;
@@ -77,78 +75,91 @@
             position: relative;
             z-index: 1;
             margin: 0;
-            font-size: 2rem;
+            font-size: 15pt;
+            line-height: 1.05;
         }
 
         .untertitel {
             position: relative;
             z-index: 1;
-            margin: 8px 0 0;
-            font-size: 1rem;
+            margin: 1.3mm 0 0;
+            font-size: 7.5pt;
             opacity: 0.9;
         }
 
         .abschnitt {
-            margin-top: 27px;
+            display: flex;
+            min-height: 0;
+            margin-top: 4mm;
+            flex: 1 1 auto;
+            flex-direction: column;
         }
 
         .abschnittstitel {
             display: flex;
+            height: 6mm;
+            margin-bottom: 2mm;
+            flex: 0 0 6mm;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
+            gap: 2.5mm;
         }
 
         .abschnittstitel h2 {
             margin: 0;
             color: var(--dunkelblau);
-            font-size: 1.3rem;
+            font-size: 10pt;
         }
 
         .abschnittslinie {
             flex-grow: 1;
-            height: 1px;
+            height: 0.25mm;
             background: var(--linie);
         }
 
+        /* 20 Karten passen als 4 Spalten × 5 Zeilen auf eine Seite. */
         .kartenbereich {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
+            min-height: 0;
+            flex: 1 1 auto;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-rows: repeat(5, minmax(0, 1fr));
+            gap: 2.2mm;
         }
 
         .fachkarte {
             display: flex;
-            min-height: 235px;
-            padding: 18px 14px;
+            min-width: 0;
+            min-height: 0;
+            padding: 2.2mm 1.8mm;
+            overflow: hidden;
             flex-direction: column;
             align-items: center;
             text-align: center;
-            border: 1px solid var(--linie);
-            border-radius: 14px;
+            border: 0.25mm solid var(--linie);
+            border-radius: 2.2mm;
             background: var(--weiss);
-            box-shadow: 0 3px 11px rgba(23, 63, 95, 0.07);
+            box-shadow: 0 1mm 2.5mm rgba(23, 63, 95, 0.07);
             break-inside: avoid;
         }
 
         .bildergruppe {
             display: flex;
-            min-height: 84px;
-            margin-bottom: 13px;
+            min-height: 14.5mm;
+            margin-bottom: 1.1mm;
             align-items: center;
             justify-content: center;
-            padding-left: 18px;
+            padding-left: 3mm;
         }
 
         .lehrerbild,
         .bildplatzhalter {
-            width: 82px;
-            height: 82px;
-            margin-left: -18px;
+            width: 14mm;
+            height: 14mm;
+            margin-left: -3mm;
             flex-shrink: 0;
-            border: 4px solid var(--weiss);
+            border: 0.7mm solid var(--weiss);
             border-radius: 50%;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+            box-shadow: 0 0.5mm 1.5mm rgba(0, 0, 0, 0.16);
         }
 
         .lehrerbild {
@@ -162,91 +173,89 @@
             justify-content: center;
             color: var(--dunkelblau);
             background: var(--hellblau);
-            font-size: 0.95rem;
+            font-size: 6pt;
             font-weight: bold;
         }
 
         .fachname {
             margin: 0;
             color: var(--dunkelblau);
-            font-size: 1.12rem;
-            line-height: 1.25;
+            font-size: 8.2pt;
+            line-height: 1.08;
         }
 
         .lehrkraefte {
-            margin: 9px 0 0;
+            margin: 1mm 0 0;
             color: var(--text);
-            font-size: 0.92rem;
+            font-size: 6.7pt;
             font-weight: bold;
-            line-height: 1.35;
+            line-height: 1.13;
         }
 
-        .wochenstunden {
-            margin: auto 0 0;
-            padding-top: 12px;
-            color: var(--nebentext);
-            font-size: 0.88rem;
+        .bewertungsinfo {
+            width: 100%;
+            margin-top: 1.4mm !important;
+            padding-top: 1.2mm !important;
+            border-top: 0.25mm solid var(--linie) !important;
+            font-size: 6.2pt;
+            line-height: 1.12;
         }
 
-        .bewertungsbereich {
-            padding: 17px 19px;
-            border-left: 5px solid var(--mittelblau);
-            border-radius: 0 10px 10px 0;
-            background: var(--hellblau);
-            line-height: 1.55;
+        .bewertungsueberschrift {
+            margin: 1mm 0 0.35mm;
+            color: var(--mittelblau);
+            font-size: 5.4pt;
+            font-weight: bold;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
 
-        .bewertungsbereich p {
-            margin: 0;
+        .bewertungsueberschrift:first-child { margin-top: 0; }
+
+        .bewertungsverhaeltnis {
+            margin: 0.25mm 0 0;
+            font-weight: bold;
+        }
+
+        .leistungserhebungen p {
+            margin: 0.45mm 0 0 !important;
         }
 
         footer {
             display: flex;
-            margin-top: 28px;
-            padding-top: 12px;
+            height: 5mm;
+            margin-top: 3mm;
+            padding-top: 1.3mm;
+            flex: 0 0 5mm;
             justify-content: space-between;
             color: #7a8992;
-            border-top: 1px solid var(--linie);
-            font-size: 0.78rem;
+            border-top: 0.25mm solid var(--linie);
+            font-size: 5.8pt;
         }
 
         @media screen and (max-width: 900px) {
-            .seite {
-                width: auto;
-                min-height: auto;
-                margin: 0;
-                padding: 20px;
-            }
-
-            .kartenbereich {
-                grid-template-columns:
-                    repeat(auto-fit, minmax(210px, 1fr));
-            }
+            .seite { margin: 0; }
         }
 
         @media print {
-            body {
+            html, body {
+                width: 210mm;
+                height: 297mm;
                 background: white;
             }
 
             .seite {
-                width: auto;
-                min-height: auto;
                 margin: 0;
-                padding: 10mm;
                 box-shadow: none;
             }
 
             .kopfbereich,
-            .bewertungsbereich,
             .bildplatzhalter {
                 print-color-adjust: exact;
                 -webkit-print-color-adjust: exact;
             }
 
-            .fachkarte {
-                box-shadow: none;
-            }
+            .fachkarte { box-shadow: none; }
 
             @page {
                 size: A4 portrait;
@@ -260,19 +269,13 @@
     <main class="seite">
         <header class="kopfbereich">
             <p class="dokumentart">Elternabend</p>
-
-            <h1>
-                Informationsblatt Klasse $KLASSE
-            </h1>
-
-            <p class="untertitel">
-                Lehrkräfte, Fächer und Leistungsbewertung
-            </p>
+            <h1>Informationsblatt Klasse $KLASSE</h1>
+            <p class="untertitel">Lehrkräfte, Fächer und Leistungsbewertung</p>
         </header>
 
         <section class="abschnitt">
             <div class="abschnittstitel">
-                <h2>Lehrkräfte der Klasse</h2>
+                <h2>Lehrkräfte und Fächer der Klasse</h2>
                 <div class="abschnittslinie"></div>
             </div>
 
@@ -281,24 +284,9 @@
             </div>
         </section>
 
-        <section class="abschnitt">
-            <div class="abschnittstitel">
-                <h2>Leistungsbewertung</h2>
-                <div class="abschnittslinie"></div>
-            </div>
-
-            <div class="bewertungsbereich">
-                <p>
-                    Angaben zu Klassenarbeiten, sonstigen
-                    Leistungsnachweisen und zur Notengewichtung
-                    werden in Version 1.4 ergänzt.
-                </p>
-            </div>
-        </section>
-
         <footer>
             <span>$ANZAHL Unterrichtseinträge</span>
-            <span>Erstellt mit SchoolPublisher 1.3</span>
+            <span>Erstellt mit SchoolPublisher 1.4.2</span>
         </footer>
     </main>
 </body>
