@@ -511,10 +511,9 @@ class ElternabendHtmlRenderer:
             and (
                 "evangelisch" in normalisiert
                 or "ev." in normalisiert
-                or "evang" in normalisiert
             )
         ):
-            return "Religion (ev.)"
+            return "Ev. Religion"
 
         if (
             "religion" in normalisiert
@@ -523,7 +522,7 @@ class ElternabendHtmlRenderer:
                 or "kath." in normalisiert
             )
         ):
-            return "Religion (kath.)"
+            return "Kath. Religion"
 
         return self._fach_gruppen.get(key, original)
 

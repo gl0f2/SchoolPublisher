@@ -26,50 +26,27 @@ from validator import UnterrichtValidator
 
 def html_als_pdf_speichern(html_datei: Path) -> Path | None:
     browser = None
-
-    # Linux / Kubuntu
-    for name in (
-        "google-chrome",
-        "google-chrome-stable",
-        "chromium",
-        "chromium-browser",
-        "microsoft-edge",
+    for kandidat in (
+        Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+        Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
+        Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+        Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
     ):
-        gefunden = shutil.which(name)
-        if gefunden:
-            browser = Path(gefunden)
+        if kandidat.is_file():
+            browser = kandidat
             break
-
-    # Windows
-    if browser is None:
-        for kandidat in (
-            Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-            Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
-            Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
-            Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
-        ):
-            if kandidat.is_file():
-                browser = kandidat
-                break
-
     if browser is None:
         return None
-
     pdf_datei = html_datei.with_suffix(".pdf")
     befehl = [
-        str(browser),
-        "--headless",
-        "--disable-gpu",
-        "--no-pdf-header-footer",
-        f"--print-to-pdf={pdf_datei.resolve()}",
-        html_datei.resolve().as_uri(),
+        str(browser), "--headless", "--disable-gpu", "--no-pdf-header-footer",
+        f"--print-to-pdf={pdf_datei.resolve()}", html_datei.resolve().as_uri(),
     ]
     ergebnis = subprocess.run(befehl, capture_output=True, text=True, timeout=60)
-
     if ergebnis.returncode != 0 or not pdf_datei.is_file():
         return None
-
     return pdf_datei
+
 
 def main() -> None:
     print("=" * 60)

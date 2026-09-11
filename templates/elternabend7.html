@@ -41,68 +41,35 @@ html,body{margin:0;padding:0;background:#dde5ed;color:var(--ink);font-family:"Se
   display:block;
   margin-top:.8mm;
 }
-.card-main.breit .details{
+.card-main.breit .photos{
   width:100%;
-}
-
-.card.breite-karte .wide-header{
-  display:grid;
-  grid-template-columns:minmax(24mm,auto) 1fr;
+  height:17mm;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
   gap:2mm;
-  align-items:center;
-  min-height:18mm;
-  margin-bottom:1mm;
-}
-.card.breite-karte .wide-subject{
-  display:flex;
-  align-items:center;
-  gap:2mm;
-  min-width:0;
-}
-.card.breite-karte .wide-subject .subject{
-  font-size:10pt;
-  white-space:normal;
-}
-.card.breite-karte .wide-teachers{
-  min-width:0;
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-  gap:1.8mm;
-}
-.card.breite-karte .wide-teachers .photos{
-  width:auto;
-  height:16mm;
-  display:flex;
-  gap:1mm;
+  margin-bottom:.8mm;
   overflow:visible;
-  flex:0 0 auto;
 }
-.card.breite-karte .wide-teachers .photos .teacher-photo,
-.card.breite-karte .wide-teachers .photos .photo-placeholder,
-.card.breite-karte .wide-teachers .photos .lehrerbild,
-.card.breite-karte .wide-teachers .photos .bildplatzhalter{
-  width:11mm;
-  height:16mm;
+.card-main.breit .photos .teacher-photo,
+.card-main.breit .photos .photo-placeholder,
+.card-main.breit .photos .lehrerbild,
+.card-main.breit .photos .bildplatzhalter{
+  width:14mm;
+  height:17mm;
   margin:0;
   border:0;
   flex:0 0 auto;
 }
-.card.breite-karte .wide-teachers .teacher{
-  margin:0;
-  max-width:42mm;
-  text-align:left;
-  font-size:5.7pt;
-  line-height:1.2;
-}
-.card-main.breit{
-  display:block;
-  margin-top:0;
-}
 .card-main.breit .details{
   width:100%;
 }
-
+.card-main.breit .teacher{
+  text-align:center;
+  font-size:6pt;
+  line-height:1.15;
+  margin:0 0 .8mm;
+}
 .wide-info-row{
   display:grid;
   grid-template-columns:1fr 1.35fr;

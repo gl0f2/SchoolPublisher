@@ -1,4 +1,4 @@
-"""SchoolPublisher Version 2.2 - Notentransparenzblatt."""
+"""SchoolPublisher Version 2.3 - Notentransparenzblatt."""
 
 from pathlib import Path
 import shutil
@@ -10,11 +10,10 @@ from config import (
     IMAGE_DIR,
     LEHRKRAEFTE_FILE,
     KLASSEN_FILE,
-    MATRIX_FILE,
     OUTPUT_DIR,
     TEMPLATE_DIR,
 )
-from importer import MatrixImporter
+from schoolmanager_importer import SchoolmanagerImporter
 from bewertungen_importer import BewertungenImporter
 from lehrkraefte_importer import LehrkraefteImporter
 from klassen_importer import KlassenImporter
@@ -22,6 +21,9 @@ from models import Schule
 from project import Projekt
 from renderer import ElternabendHtmlRenderer, KlassenHtmlRenderer, KlassenTextRenderer
 from validator import UnterrichtValidator
+
+
+SCHOOLMANAGER_DATEN_DIR = Path(__file__).resolve().parent / "schoolmanager_daten"
 
 
 def html_als_pdf_speichern(html_datei: Path) -> Path | None:
@@ -71,13 +73,14 @@ def html_als_pdf_speichern(html_datei: Path) -> Path | None:
 
     return pdf_datei
 
+
 def main() -> None:
     print("=" * 60)
-    print("SchoolPublisher Version 2.2 - Notentransparenzblatt")
+    print("SchoolPublisher Version 2.3 - Schoolmanager A/B")
     print("=" * 60)
 
     try:
-        unterrichtsliste = MatrixImporter(MATRIX_FILE).load()
+        unterrichtsliste = SchoolmanagerImporter(SCHOOLMANAGER_DATEN_DIR).load()
         fehlerliste = UnterrichtValidator().pruefen(unterrichtsliste)
 
         if fehlerliste:
@@ -87,7 +90,7 @@ def main() -> None:
             print("\nProgramm wird beendet.")
             return
 
-        print("\n✓ Unterrichtsdaten erfolgreich geprüft.")
+        print("\n✓ Schoolmanager-Unterrichtsdaten erfolgreich geprüft.")
 
         lehrkraeftekatalog = LehrkraefteImporter(LEHRKRAEFTE_FILE).load()
         print(
@@ -106,6 +109,7 @@ def main() -> None:
             "✓ Bewertungsregeln eingelesen: "
             f"{len(bewertungskatalog.regeln)} Regeln"
         )
+
         schule = Schule(
             unterricht=unterrichtsliste,
             lehrkraeftekatalog=lehrkraeftekatalog,
@@ -117,7 +121,7 @@ def main() -> None:
         print(f"\nProjekt: {projekt.name}\n")
         print(f"Unterrichtseinträge : {len(schule.unterricht)}")
         print(f"Klassen             : {len(schule.klassen())}")
-        print(f"Lehrkräfte Matrix   : {len(schule.lehrkraefte())}")
+        print(f"Lehrkräfte Unterricht: {len(schule.lehrkraefte())}")
         print(f"Lehrkräfte Stamm    : {len(lehrkraeftekatalog)}")
         print(f"Fächer              : {len(schule.faecher())}")
 
@@ -151,6 +155,7 @@ def main() -> None:
                 projekt.schule,
                 klassenname,
             )
+
             print(f"Klasse {klassenname}")
             print(f"   Text        : {text_datei.name}")
             print(f"   HTML        : {html_datei.name}")
@@ -162,7 +167,7 @@ def main() -> None:
                 print("   PDF         : nicht erzeugt (Edge/Chrome nicht gefunden)\n")
 
         print("=" * 60)
-        print("SchoolPublisher Version 2.2 erfolgreich beendet.")
+        print("SchoolPublisher Version 2.3 erfolgreich beendet.")
         print("=" * 60)
 
     except (FileNotFoundError, ValueError, OSError, ImportError) as fehler:

@@ -511,10 +511,9 @@ class ElternabendHtmlRenderer:
             and (
                 "evangelisch" in normalisiert
                 or "ev." in normalisiert
-                or "evang" in normalisiert
             )
         ):
-            return "Religion (ev.)"
+            return "Ev. Religion"
 
         if (
             "religion" in normalisiert
@@ -523,27 +522,9 @@ class ElternabendHtmlRenderer:
                 or "kath." in normalisiert
             )
         ):
-            return "Religion (kath.)"
+            return "Kath. Religion"
 
         return self._fach_gruppen.get(key, original)
-
-    @staticmethod
-    def _bewertungs_fachname(fachname: str) -> str:
-        """Ordnet den kurzen Karten-Anzeigenamen dem Fachnamen in bewertungen.xlsx zu."""
-        key = " ".join(fachname.strip().casefold().split())
-
-        zuordnung = {
-            "bk": "Bildende Kunst (BK)",
-            "ev. religion": "Religion (ev.)",
-            "kath. religion": "Religion (kath.)",
-            "ium": "Informatik und Medienbildung (IUM)",
-            "ium": "Informatik und Medienbildung (IUM)",
-            "informatik und medienbildung": "Informatik und Medienbildung (IUM)",
-            "informatik und medienbildung (ium)": "Informatik und Medienbildung (IUM)",
-            "information und medienbildung": "Informatik und Medienbildung (IUM)",
-        }
-
-        return zuordnung.get(key, fachname)
 
     def _fachkarte_erstellen(
         self,
@@ -562,8 +543,7 @@ class ElternabendHtmlRenderer:
         )
         emails = [lehrkraft.email.strip() for lehrkraft in lehrkraefte if lehrkraft.email.strip()]
         email_html = " / ".join(escape(email) for email in emails) if emails else "E-Mail nicht hinterlegt"
-        bewertungs_fachname = self._bewertungs_fachname(fachname)
-        bewertung = schule.bewertung_fuer_fach(bewertungs_fachname, klasse.name)
+        bewertung = schule.bewertung_fuer_fach(fachname, klasse.name)
         breit = len(lehrkraefte) >= 3
         bewertung_html = (
             self._bewertung_breit_html(bewertung)
@@ -693,48 +673,30 @@ class ElternabendHtmlRenderer:
         bereiche = [
             ("Mündlich", bewertung.gewicht_muendlich),
             ("Schriftlich", bewertung.gewicht_schriftlich),
-            ("Praktisch", bewertung.gewicht_praktisch),
         ]
-        bereiche = [
-            (bezeichnung, gewicht)
-            for bezeichnung, gewicht in bereiche
-            if gewicht is not None and gewicht > 0
-        ]
+        if bewertung.gewicht_praktisch is not None:
+            bereiche.append(("Praktisch", bewertung.gewicht_praktisch))
 
-        ratio_html = ""
-        if len(bereiche) >= 2:
-            if len(bereiche) == 3:
-                kurzformen = {
-                    "Mündlich": "Mündl.",
-                    "Schriftlich": "Schr.",
-                    "Praktisch": "Pra.",
-                }
-                bereiche = [
-                    (kurzformen.get(bezeichnung, bezeichnung), gewicht)
-                    for bezeichnung, gewicht in bereiche
-                ]
-
-            raster_elemente: list[str] = []
-            for index, (bezeichnung, _) in enumerate(bereiche):
-                if index:
-                    raster_elemente.append('<span class="ratio-colon">:</span>')
-                raster_elemente.append(
-                    f'<span class="ratio-heading">{escape(bezeichnung)}</span>'
-                )
-
-            for index, (_, gewicht) in enumerate(bereiche):
-                if index:
-                    raster_elemente.append('<span class="ratio-colon">:</span>')
-                raster_elemente.append(
-                    f'<span class="ratio-value">{escape(zahl_text(gewicht))}</span>'
-                )
-
-            ratio_html = (
-                '<p class="label">Bewertung</p>'
-                f'<div class="ratio-grid ratio-{len(bereiche)}">'
-                + "".join(raster_elemente)
-                + "</div>"
+        raster_elemente: list[str] = []
+        for index, (bezeichnung, _) in enumerate(bereiche):
+            if index:
+                raster_elemente.append('<span class="ratio-colon">:</span>')
+            raster_elemente.append(
+                f'<span class="ratio-heading">{escape(bezeichnung)}</span>'
             )
+
+        for index, (_, gewicht) in enumerate(bereiche):
+            if index:
+                raster_elemente.append('<span class="ratio-colon">:</span>')
+            raster_elemente.append(
+                f'<span class="ratio-value">{escape(zahl_text(gewicht))}</span>'
+            )
+
+        ratio_html = (
+            f'<div class="ratio-grid ratio-{len(bereiche)}">'
+            + "".join(raster_elemente)
+            + "</div>"
+        )
 
         erhebungen = bewertung.vorhandene_erhebungen()
         erhebungen_html = "".join(
@@ -746,6 +708,7 @@ class ElternabendHtmlRenderer:
             else ""
         )
         return f"""
+            <p class="label">Bewertung</p>
             {ratio_html}
             <div class="assessments">{erhebungen_html}</div>
             {zusatz_html}
@@ -769,41 +732,21 @@ class ElternabendHtmlRenderer:
         bereiche = [
             ("Mündlich", bewertung.gewicht_muendlich),
             ("Schriftlich", bewertung.gewicht_schriftlich),
-            ("Praktisch", bewertung.gewicht_praktisch),
-        ]
-        bereiche = [
-            (bezeichnung, gewicht)
-            for bezeichnung, gewicht in bereiche
-            if gewicht is not None and gewicht > 0
         ]
 
-        bewertung_box_html = ""
-        if len(bereiche) >= 2:
-            if len(bereiche) == 3:
-                kurzformen = {
-                    "Mündlich": "Mündl.",
-                    "Schriftlich": "Schr.",
-                    "Praktisch": "Pra.",
-                }
-                bereiche = [
-                    (kurzformen.get(bezeichnung, bezeichnung), gewicht)
-                    for bezeichnung, gewicht in bereiche
-                ]
+        if bewertung.gewicht_praktisch is not None:
+            bereiche.append(
+                ("Praktisch", bewertung.gewicht_praktisch)
+            )
 
-            bezeichnungen = " : ".join(
-                bezeichnung
-                for bezeichnung, _ in bereiche
-            )
-            gewichte = " : ".join(
-                zahl_text(gewicht)
-                for _, gewicht in bereiche
-            )
-            bewertung_box_html = (
-                '<div class="wide-box">'
-                '<strong>Bewertung</strong><br>'
-                f'{escape(bezeichnungen)} = {escape(gewichte)}'
-                '</div>'
-            )
+        bezeichnungen = " : ".join(
+            bezeichnung
+            for bezeichnung, _ in bereiche
+        )
+        gewichte = " : ".join(
+            zahl_text(gewicht)
+            for _, gewicht in bereiche
+        )
 
         erhebungen = bewertung.vorhandene_erhebungen()
         erhebungen_text = " · ".join(
@@ -823,7 +766,10 @@ class ElternabendHtmlRenderer:
 
         return f"""
             <div class="wide-info-row">
-                {bewertung_box_html}
+                <div class="wide-box">
+                    <strong>Bewertung</strong><br>
+                    {escape(bezeichnungen)} = {escape(gewichte)}
+                </div>
                 <div class="wide-box">
                     <strong>Leistungserhebungen</strong><br>
                     {escape(erhebungen_text)}

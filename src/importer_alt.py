@@ -10,10 +10,6 @@ from models import Unterricht
 
 
 class MatrixImporter:
-    IGNORIERTE_FAECHER = {
-        "poolstunden",
-    }
-
     def __init__(self, filename: Path):
         self.filename = filename
 
@@ -37,12 +33,6 @@ class MatrixImporter:
         unterrichtsliste: list[Unterricht] = []
 
         for _, row in df.iterrows():
-            fachname = self._text_oder_leer(row.get("Fachname"))
-
-            # Interne Einträge wie Poolstunden erscheinen nicht in der Ausgabe.
-            if fachname.casefold() in self.IGNORIERTE_FAECHER:
-                continue
-
             kopplung = self._text_oder_none(row.get("Kopplung"))
             stundenplan_name = self._text_oder_leer(
                 row.get("Bezeichnung im Stundenplan")
@@ -52,7 +42,7 @@ class MatrixImporter:
                 klasse=self._text_oder_leer(row.get("Klasse")),
                 fach=self._text_oder_leer(row.get("Fach")),
                 lehrer=self._text_oder_leer(row.get("Lehrer")),
-                fachname=fachname,
+                fachname=self._text_oder_leer(row.get("Fachname")),
                 stundenplan_name=stundenplan_name,
                 wochenstunden=self._zahl_oder_null(row.get("Wochenstunden", 0)),
                 kopplung=kopplung,
@@ -61,6 +51,7 @@ class MatrixImporter:
             unterrichtsliste.append(eintrag)
 
         return unterrichtsliste
+
 
     @staticmethod
     def _zahl_oder_null(wert) -> float:

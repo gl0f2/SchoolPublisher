@@ -18,3 +18,39 @@ output/
 # Betriebssystem
 .DS_Store
 Thumbs.db
+
+# PyCharm
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Schoolmanager – heruntergeladene Daten NICHT auf GitHub
+src/schoolmanager_daten/
+
+# Zugangsdaten / Secrets
+.env
+*.token
+token.txt
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# Lokale/schulinterne Daten
+data/
+
+# LibreOffice temporäre Sperrdateien
+.~lock.*#
+
+# Generierte Ausgaben
+output/
+
+# Virtuelle Python-Umgebung
+.venv/
+
+# Personenfotos / lokale Bilder
+images/
+

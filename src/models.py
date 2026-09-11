@@ -1,8 +1,7 @@
 """Datenmodelle für SchoolPublisher."""
 from __future__ import annotations
 from dataclasses import dataclass, field
-import json
-from pathlib import Path
+import re
 
 @dataclass(frozen=True)
 class Leistungserhebung:
@@ -16,59 +15,52 @@ class Leistungserhebung:
 
 @dataclass(frozen=True)
 class Bewertungsinfo:
-    bereich_links: str = "Mündlich"
-    bereich_rechts: str = "Schriftlich"
-    gewicht_links: float = 2
-    gewicht_rechts: float = 1
+    gewicht_muendlich: float
+    gewicht_schriftlich: float
+    gewicht_praktisch: float | None = None
     erhebungen: tuple[Leistungserhebung, ...] = ()
+    zusatzinformation: str = ""
 
     @property
     def bezeichnung(self) -> str:
-        return f"{self.bereich_links} : {self.bereich_rechts}"
+        bereiche = ["Mündlich", "Schriftlich"]
+        if self.gewicht_praktisch is not None:
+            bereiche.append("Praktisch")
+        return " : ".join(bereiche)
 
     @property
     def verhaeltnis(self) -> str:
-        return f"{zahl_text(self.gewicht_links)} : {zahl_text(self.gewicht_rechts)}"
+        gewichte = [self.gewicht_muendlich, self.gewicht_schriftlich]
+        if self.gewicht_praktisch is not None:
+            gewichte.append(self.gewicht_praktisch)
+        return " : ".join(zahl_text(wert) for wert in gewichte)
 
     def vorhandene_erhebungen(self) -> list[Leistungserhebung]:
         return [e for e in self.erhebungen if e.vorhanden]
 
-    def gewichtete_erhebungen(self) -> list[Leistungserhebung]:
-        return [e for e in self.vorhandene_erhebungen() if e.gewicht is not None and e.gewicht > 0]
 
 @dataclass
 class Bewertungskatalog:
-    fachwerte: dict[str, Bewertungsinfo] = field(default_factory=dict)
+    regeln: dict[tuple[int, str, str], Bewertungsinfo] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        self.fachwerte = {k.strip().casefold(): v for k, v in self.fachwerte.items() if k.strip()}
+        self.regeln = {
+            (int(stufe), klasse.strip().casefold(), fach.strip().casefold()): info
+            for (stufe, klasse, fach), info in self.regeln.items()
+            if klasse.strip() and fach.strip()
+        }
 
-    def fuer_fach(self, fachname: str) -> Bewertungsinfo | None:
-        return self.fachwerte.get(fachname.strip().casefold())
+    def fuer_fach(self, fachname: str, klassenname: str) -> Bewertungsinfo | None:
+        stufe = klassenstufe_aus_klassenname(klassenname)
+        if stufe is None:
+            return None
+        fach = fachname.strip().casefold()
+        klasse = klassenname.strip().casefold()
+        return (
+            self.regeln.get((stufe, klasse, fach))
+            or self.regeln.get((stufe, "alle", fach))
+        )
 
-    @classmethod
-    def aus_json(cls, pfad: Path) -> "Bewertungskatalog":
-        if not pfad.is_file():
-            return cls()
-        daten = json.loads(pfad.read_text(encoding="utf-8"))
-        fachwerte = {}
-        for fachname, fach in daten.get("faecher", {}).items():
-            erhebungen = tuple(
-                Leistungserhebung(
-                    bezeichnung=str(e.get("bezeichnung", "")).strip(),
-                    anzahl=max(0, int(e.get("anzahl", 0) or 0)),
-                    gewicht=positive_zahl_oder_none(e.get("gewicht")),
-                )
-                for e in fach.get("leistungserhebungen", [])
-            )
-            fachwerte[fachname] = Bewertungsinfo(
-                bereich_links=str(fach.get("bereich_links", "Mündlich")).strip() or "Mündlich",
-                bereich_rechts=str(fach.get("bereich_rechts", "Schriftlich")).strip() or "Schriftlich",
-                gewicht_links=positive_zahl(fach.get("gewicht_links", 2), 2),
-                gewicht_rechts=positive_zahl(fach.get("gewicht_rechts", 1), 1),
-                erhebungen=erhebungen,
-            )
-        return cls(fachwerte=fachwerte)
 
 def positive_zahl(wert: object, standard: float) -> float:
     try:
@@ -88,6 +80,11 @@ def positive_zahl_oder_none(wert: object) -> float | None:
 
 def zahl_text(wert: float) -> str:
     return f"{wert:g}"
+
+def klassenstufe_aus_klassenname(klassenname: str) -> int | None:
+    treffer = re.match(r"\s*(\d+)", klassenname)
+    return int(treffer.group(1)) if treffer else None
+
 
 @dataclass(frozen=True)
 class Unterricht:
@@ -134,6 +131,7 @@ class Fach:
 class Schule:
     unterricht: list[Unterricht]
     lehrkraeftekatalog: dict[str, Lehrkraft] = field(default_factory=dict)
+    klassenkatalog: dict[str, Klasse] = field(default_factory=dict)
     bewertungskatalog: Bewertungskatalog = field(default_factory=Bewertungskatalog)
     _klassen: tuple[str, ...] = field(init=False, repr=False)
     _lehrkraefte: tuple[str, ...] = field(init=False, repr=False)
@@ -143,15 +141,20 @@ class Schule:
         self._lehrkraefte = tuple(sorted({e.lehrer.strip() for e in self.unterricht if e.lehrer.strip()}, key=str.casefold))
         self._faecher = tuple(sorted({e.anzeigename for e in self.unterricht if e.anzeigename}, key=str.casefold))
         self.lehrkraeftekatalog = {k.strip().casefold(): v for k, v in self.lehrkraeftekatalog.items()}
+        self.klassenkatalog = {k.strip().casefold(): v for k, v in self.klassenkatalog.items()}
     def klassen(self): return list(self._klassen)
     def lehrkraefte(self): return list(self._lehrkraefte)
     def faecher(self): return list(self._faecher)
     def unterricht_der_klasse(self, name): return [e for e in self.unterricht if e.klasse.strip().casefold() == name.strip().casefold()]
     def unterricht_der_lehrkraft(self, k): return [e for e in self.unterricht if e.lehrer.strip().casefold() == k.strip().casefold()]
     def klasse(self, name):
-        return next((Klasse(n) for n in self._klassen if n.casefold() == name.strip().casefold()), None)
+        schluessel = name.strip().casefold()
+        if schluessel in self.klassenkatalog:
+            return self.klassenkatalog[schluessel]
+        return next((Klasse(n) for n in self._klassen if n.casefold() == schluessel), None)
     def lehrkraft(self, k):
         return self.lehrkraeftekatalog.get(k.strip().casefold(), Lehrkraft(kuerzel=k.strip()))
     def fach(self, name):
         return next((Fach(n) for n in self._faecher if n.casefold() == name.strip().casefold()), None)
-    def bewertung_fuer_fach(self, name): return self.bewertungskatalog.fuer_fach(name)
+    def bewertung_fuer_fach(self, name, klassenname):
+        return self.bewertungskatalog.fuer_fach(name, klassenname)

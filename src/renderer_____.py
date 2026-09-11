@@ -251,27 +251,17 @@ class ElternabendHtmlRenderer:
             ),
         )
 
-        karten_mit_breite: list[tuple[str, int]] = []
-
-        for fachname in sortierte_fachnamen:
-            eintraege = fachgruppen[fachname]
-            anzahl_lehrkraefte = len(
-                self._eindeutige_lehrkraefte(eintraege)
+        karten = [
+            self._fachkarte_erstellen(
+                schule=schule,
+                klasse=klasse,
+                fachname=fachname,
+                eintraege=fachgruppen[fachname],
             )
+            for fachname in sortierte_fachnamen
+        ]
 
-            karten_mit_breite.append(
-                (
-                    self._fachkarte_erstellen(
-                        schule=schule,
-                        klasse=klasse,
-                        fachname=fachname,
-                        eintraege=eintraege,
-                    ),
-                    2 if anzahl_lehrkraefte >= 3 else 1,
-                )
-            )
-
-        anzahl_faecher = len(karten_mit_breite)
+        anzahl_faecher = len(karten)
         klassenleitung_html = self._klassenleitung_html(
             schule=schule,
             klasse=klasse,
@@ -281,12 +271,9 @@ class ElternabendHtmlRenderer:
         logo_pfad = quote((Path("..") / "images" / "MPGNürtingen.png").as_posix())
         qr_pfad = quote((Path("..") / "images" / "MPG_QR.png").as_posix())
 
-        # Pro Seite stehen 15 Rasterplätze zur Verfügung.
-        # Normale Karten zählen als 1 Platz, breite Mehrfachkarten als 2 Plätze.
-        kartenseiten = self._karten_auf_seiten(
-            karten_mit_breite,
-            maximale_plaetze=15,
-        )
+        # Maximal 15 Karten pro A4-Seite. Weitere Karten werden auf einer
+        # zweiten beziehungsweise weiteren Druckseite ausgegeben.
+        kartenseiten = [karten[i:i + 15] for i in range(0, len(karten), 15)] or [[]]
         seiten_html = "\n".join(
             self._seite_html(
                 klassenname=klassenname,
@@ -319,32 +306,6 @@ class ElternabendHtmlRenderer:
         )
 
         return dateipfad
-
-    @staticmethod
-    def _karten_auf_seiten(
-        karten_mit_breite: list[tuple[str, int]],
-        maximale_plaetze: int,
-    ) -> list[list[str]]:
-        """Verteilt Karten nach ihrem tatsächlichen Platzbedarf auf Seiten."""
-        seiten: list[list[str]] = []
-        aktuelle_seite: list[str] = []
-        belegte_plaetze = 0
-
-        for karten_html, breite in karten_mit_breite:
-            breite = max(1, breite)
-
-            if aktuelle_seite and belegte_plaetze + breite > maximale_plaetze:
-                seiten.append(aktuelle_seite)
-                aktuelle_seite = []
-                belegte_plaetze = 0
-
-            aktuelle_seite.append(karten_html)
-            belegte_plaetze += breite
-
-        if aktuelle_seite:
-            seiten.append(aktuelle_seite)
-
-        return seiten or [[]]
 
     @staticmethod
     def _klassenleitung_html(
@@ -511,10 +472,9 @@ class ElternabendHtmlRenderer:
             and (
                 "evangelisch" in normalisiert
                 or "ev." in normalisiert
-                or "evang" in normalisiert
             )
         ):
-            return "Religion (ev.)"
+            return "Ev. Religion"
 
         if (
             "religion" in normalisiert
@@ -523,27 +483,9 @@ class ElternabendHtmlRenderer:
                 or "kath." in normalisiert
             )
         ):
-            return "Religion (kath.)"
+            return "Kath. Religion"
 
         return self._fach_gruppen.get(key, original)
-
-    @staticmethod
-    def _bewertungs_fachname(fachname: str) -> str:
-        """Ordnet den kurzen Karten-Anzeigenamen dem Fachnamen in bewertungen.xlsx zu."""
-        key = " ".join(fachname.strip().casefold().split())
-
-        zuordnung = {
-            "bk": "Bildende Kunst (BK)",
-            "ev. religion": "Religion (ev.)",
-            "kath. religion": "Religion (kath.)",
-            "ium": "Informatik und Medienbildung (IUM)",
-            "ium": "Informatik und Medienbildung (IUM)",
-            "informatik und medienbildung": "Informatik und Medienbildung (IUM)",
-            "informatik und medienbildung (ium)": "Informatik und Medienbildung (IUM)",
-            "information und medienbildung": "Informatik und Medienbildung (IUM)",
-        }
-
-        return zuordnung.get(key, fachname)
 
     def _fachkarte_erstellen(
         self,
@@ -555,26 +497,20 @@ class ElternabendHtmlRenderer:
         kuerzel_liste = self._eindeutige_lehrkraefte(eintraege)
         lehrkraefte = [schule.lehrkraft(kuerzel) for kuerzel in kuerzel_liste]
         bilder_html = "\n".join(self._bild_html(lehrkraft) for lehrkraft in lehrkraefte)
-        namen_html = (
-            " · ".join(escape(lehrkraft.kurzer_name) for lehrkraft in lehrkraefte)
-            if len(lehrkraefte) >= 3
-            else "<br>".join(escape(lehrkraft.kurzer_name) for lehrkraft in lehrkraefte)
-        )
+        namen_html = "<br>".join(escape(lehrkraft.kurzer_name) for lehrkraft in lehrkraefte)
         emails = [lehrkraft.email.strip() for lehrkraft in lehrkraefte if lehrkraft.email.strip()]
         email_html = " / ".join(escape(email) for email in emails) if emails else "E-Mail nicht hinterlegt"
-        bewertungs_fachname = self._bewertungs_fachname(fachname)
-        bewertung = schule.bewertung_fuer_fach(bewertungs_fachname, klasse.name)
-        breit = len(lehrkraefte) >= 3
+        bewertung = schule.bewertung_fuer_fach(fachname, klasse.name)
+        kompakt = len(lehrkraefte) >= 3
         bewertung_html = (
-            self._bewertung_breit_html(bewertung)
-            if breit
+            self._bewertung_kompakt_html(bewertung)
+            if kompakt
             else self._bewertung_html(bewertung)
         )
         accent, icon = self._fach_design(fachname)
         multi = " multi" if len(lehrkraefte) > 1 else ""
         mehrfach = " mehrere" if len(lehrkraefte) > 1 else ""
-        artikelklasse = " breite-karte" if breit else ""
-        hauptklasse = " breit" if breit else ""
+        kompakt_klasse = " kompakt" if kompakt else ""
         anzahlklasse = f" count-{min(len(lehrkraefte), 5)}"
         klassenlehrer = {kuerzel.strip().casefold() for kuerzel in klasse.klassenlehrer}
         ist_klassenlehrerfach = any(
@@ -583,35 +519,13 @@ class ElternabendHtmlRenderer:
         )
         fachanzeige = f"{fachname} (KL)" if ist_klassenlehrerfach else fachname
 
-        if breit:
-            return f"""
-            <article class="card{artikelklasse}" style="--accent:{accent}">
-                <div class="wide-header">
-                    <div class="wide-subject">
-                        <div class="subject-icon">{escape(icon)}</div>
-                        <h3 class="subject">{escape(fachanzeige)}</h3>
-                    </div>
-                    <div class="wide-teachers">
-                        <div class="photos{multi}{anzahlklasse}">{bilder_html}</div>
-                        <p class="teacher">{namen_html}</p>
-                    </div>
-                </div>
-                <div class="card-main{hauptklasse}">
-                    <div class="details">
-                        {bewertung_html}
-                    </div>
-                </div>
-                <div class="email">{email_html}</div>
-            </article>
-            """
-
         return f"""
-        <article class="card{artikelklasse}" style="--accent:{accent}">
+        <article class="card" style="--accent:{accent}">
             <div class="card-head">
                 <div class="subject-icon">{escape(icon)}</div>
                 <h3 class="subject">{escape(fachanzeige)}</h3>
             </div>
-            <div class="card-main{mehrfach}{hauptklasse}">
+            <div class="card-main{mehrfach}{kompakt_klasse}">
                 <div class="photos{multi}{anzahlklasse}">{bilder_html}</div>
                 <div class="details">
                     <p class="teacher">{namen_html}</p>
@@ -693,48 +607,30 @@ class ElternabendHtmlRenderer:
         bereiche = [
             ("Mündlich", bewertung.gewicht_muendlich),
             ("Schriftlich", bewertung.gewicht_schriftlich),
-            ("Praktisch", bewertung.gewicht_praktisch),
         ]
-        bereiche = [
-            (bezeichnung, gewicht)
-            for bezeichnung, gewicht in bereiche
-            if gewicht is not None and gewicht > 0
-        ]
+        if bewertung.gewicht_praktisch is not None:
+            bereiche.append(("Praktisch", bewertung.gewicht_praktisch))
 
-        ratio_html = ""
-        if len(bereiche) >= 2:
-            if len(bereiche) == 3:
-                kurzformen = {
-                    "Mündlich": "Mündl.",
-                    "Schriftlich": "Schr.",
-                    "Praktisch": "Pra.",
-                }
-                bereiche = [
-                    (kurzformen.get(bezeichnung, bezeichnung), gewicht)
-                    for bezeichnung, gewicht in bereiche
-                ]
-
-            raster_elemente: list[str] = []
-            for index, (bezeichnung, _) in enumerate(bereiche):
-                if index:
-                    raster_elemente.append('<span class="ratio-colon">:</span>')
-                raster_elemente.append(
-                    f'<span class="ratio-heading">{escape(bezeichnung)}</span>'
-                )
-
-            for index, (_, gewicht) in enumerate(bereiche):
-                if index:
-                    raster_elemente.append('<span class="ratio-colon">:</span>')
-                raster_elemente.append(
-                    f'<span class="ratio-value">{escape(zahl_text(gewicht))}</span>'
-                )
-
-            ratio_html = (
-                '<p class="label">Bewertung</p>'
-                f'<div class="ratio-grid ratio-{len(bereiche)}">'
-                + "".join(raster_elemente)
-                + "</div>"
+        raster_elemente: list[str] = []
+        for index, (bezeichnung, _) in enumerate(bereiche):
+            if index:
+                raster_elemente.append('<span class="ratio-colon">:</span>')
+            raster_elemente.append(
+                f'<span class="ratio-heading">{escape(bezeichnung)}</span>'
             )
+
+        for index, (_, gewicht) in enumerate(bereiche):
+            if index:
+                raster_elemente.append('<span class="ratio-colon">:</span>')
+            raster_elemente.append(
+                f'<span class="ratio-value">{escape(zahl_text(gewicht))}</span>'
+            )
+
+        ratio_html = (
+            f'<div class="ratio-grid ratio-{len(bereiche)}">'
+            + "".join(raster_elemente)
+            + "</div>"
+        )
 
         erhebungen = bewertung.vorhandene_erhebungen()
         erhebungen_html = "".join(
@@ -746,6 +642,7 @@ class ElternabendHtmlRenderer:
             else ""
         )
         return f"""
+            <p class="label">Bewertung</p>
             {ratio_html}
             <div class="assessments">{erhebungen_html}</div>
             {zusatz_html}
@@ -753,57 +650,34 @@ class ElternabendHtmlRenderer:
 
 
     @staticmethod
-    def _bewertung_breit_html(
+    def _bewertung_kompakt_html(
         bewertung: Bewertungsinfo | None,
     ) -> str:
         if bewertung is None:
             return (
-                '<div class="wide-info-row">'
-                '<div class="wide-box">'
-                '<strong>Bewertung</strong><br>'
-                'Informationen folgen'
-                '</div>'
-                '</div>'
+                '<p class="compact-line">'
+                '<strong>Bewertung:</strong> Informationen folgen'
+                '</p>'
             )
 
         bereiche = [
             ("Mündlich", bewertung.gewicht_muendlich),
             ("Schriftlich", bewertung.gewicht_schriftlich),
-            ("Praktisch", bewertung.gewicht_praktisch),
-        ]
-        bereiche = [
-            (bezeichnung, gewicht)
-            for bezeichnung, gewicht in bereiche
-            if gewicht is not None and gewicht > 0
         ]
 
-        bewertung_box_html = ""
-        if len(bereiche) >= 2:
-            if len(bereiche) == 3:
-                kurzformen = {
-                    "Mündlich": "Mündl.",
-                    "Schriftlich": "Schr.",
-                    "Praktisch": "Pra.",
-                }
-                bereiche = [
-                    (kurzformen.get(bezeichnung, bezeichnung), gewicht)
-                    for bezeichnung, gewicht in bereiche
-                ]
+        if bewertung.gewicht_praktisch is not None:
+            bereiche.append(
+                ("Praktisch", bewertung.gewicht_praktisch)
+            )
 
-            bezeichnungen = " : ".join(
-                bezeichnung
-                for bezeichnung, _ in bereiche
-            )
-            gewichte = " : ".join(
-                zahl_text(gewicht)
-                for _, gewicht in bereiche
-            )
-            bewertung_box_html = (
-                '<div class="wide-box">'
-                '<strong>Bewertung</strong><br>'
-                f'{escape(bezeichnungen)} = {escape(gewichte)}'
-                '</div>'
-            )
+        bezeichnungen = " : ".join(
+            bezeichnung
+            for bezeichnung, _ in bereiche
+        )
+        gewichte = " : ".join(
+            zahl_text(gewicht)
+            for _, gewicht in bereiche
+        )
 
         erhebungen = bewertung.vorhandene_erhebungen()
         erhebungen_text = " · ".join(
@@ -813,22 +687,20 @@ class ElternabendHtmlRenderer:
 
         zusatz = bewertung.zusatzinformation.strip()
         zusatz_html = (
-            '<div class="wide-additional">'
-            '<strong>Zusatzinformation</strong><br>'
-            f'{escape(zusatz)}'
-            '</div>'
+            f'<p class="compact-line compact-additional">{escape(zusatz)}</p>'
             if zusatz
             else ""
         )
 
         return f"""
-            <div class="wide-info-row">
-                {bewertung_box_html}
-                <div class="wide-box">
-                    <strong>Leistungserhebungen</strong><br>
-                    {escape(erhebungen_text)}
-                </div>
-            </div>
+            <p class="compact-line">
+                <strong>Bewertung:</strong>
+                {escape(bezeichnungen)} = {escape(gewichte)}
+            </p>
+            <p class="compact-line">
+                <strong>Leistungserhebungen:</strong>
+                {escape(erhebungen_text)}
+            </p>
             {zusatz_html}
         """
 

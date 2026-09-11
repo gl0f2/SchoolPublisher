@@ -1,6 +1,4 @@
-"""
-Zentrale Konfiguration für SchoolPublisher.
-"""
+"""Zentrale Konfiguration für SchoolPublisher."""
 
 from pathlib import Path
 
@@ -14,10 +12,12 @@ TEMPLATE_DIR = PROJECT_ROOT / "templates"
 
 MATRIX_FILE = DATA_DIR / "Matrix_Test.xlsx"
 LEHRKRAEFTE_FILE = DATA_DIR / "lehrer.xlsx"
+KLASSEN_FILE = DATA_DIR / "klassen.xlsx"
+BEWERTUNGEN_FILE = DATA_DIR / "bewertungen.xlsx"
 
 
 # Mehrere Unterrichtsbezeichnungen können auf dem
-# Elternabendblatt als ein gemeinsames Fach erscheinen.
+# Notentransparenzblatt als ein gemeinsames Fach erscheinen.
 FACH_GRUPPEN = {
     "Sport männlich": "Sport",
     "Sport weiblich": "Sport",
