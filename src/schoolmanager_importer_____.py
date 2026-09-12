@@ -185,19 +185,8 @@ class SchoolmanagerImporter:
             if code_key in {"spo-m", "spo-w"}:
                 return "SPO", "Sport"
 
-        # In Klassen 5 und 6 wird das Schoolmanager-Fach NWT als NIT geführt.
-        # Dadurch greifen die vorhandenen NIT-Bewertungsregeln.
-        if stufe in {5, 6} and code_key == "nwt":
-            return "NIT", "NIT"
-
-        # Diese organisatorischen bzw. für SchoolPublisher irrelevanten Fächer
-        # sollen keine Karte erzeugen.
-        if (
-            "sternstunde" in text_key
-            or code_key in {"sternstunde", "klassenlehrer", "kl"}
-            or code_key == "mtw"
-            or code_key.startswith("mug-")
-        ):
+        # Diese organisatorischen Fächer sollen keine Karte erzeugen.
+        if "sternstunde" in text_key or code_key in {"sternstunde", "klassenlehrer", "kl"}:
             return None, name
 
         # Praktika in Biologie, Physik und Chemie werden nicht dargestellt.

@@ -1,4 +1,4 @@
-"""SchoolPublisher Version 2.4.1 - integrierte Schoolmanager-Aktualisierung."""
+"""SchoolPublisher Version 2.4.0 - integrierte Schoolmanager-Aktualisierung."""
 
 from pathlib import Path
 import shutil
@@ -62,25 +62,9 @@ def html_als_pdf_speichern(html_datei: Path) -> Path | None:
     return pdf_datei if ergebnis.returncode == 0 and pdf_datei.is_file() else None
 
 
-
-def pdfs_zusammenfuehren(pdf_dateien: list[Path], ziel: Path) -> Path | None:
-    """Führt die Klassen-PDFs unter Linux mit pdfunite zu einem Dokument zusammen."""
-    pdf_dateien = [p for p in pdf_dateien if p and p.is_file()]
-    if not pdf_dateien:
-        return None
-    pdfunite = shutil.which("pdfunite")
-    if not pdfunite:
-        return None
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    ergebnis = subprocess.run(
-        [pdfunite, *map(str, pdf_dateien), str(ziel)],
-        capture_output=True, text=True, timeout=120,
-    )
-    return ziel if ergebnis.returncode == 0 and ziel.is_file() else None
-
 def main() -> None:
     print("=" * 60)
-    print("SchoolPublisher Version 2.4.1 - Schoolmanager integriert")
+    print("SchoolPublisher Version 2.4.0 - Schoolmanager integriert")
     print("=" * 60)
 
     try:
@@ -195,7 +179,6 @@ def main() -> None:
         )
 
         print("\nDokumente werden erstellt:\n")
-        erzeugte_pdfs: list[Path] = []
         for klassenname in projekt.schule.klassen():
             text_datei = text_renderer.rendern(projekt.schule, klassenname)
             html_datei = html_renderer.rendern(projekt.schule, klassenname)
@@ -212,20 +195,9 @@ def main() -> None:
                 f"   PDF         : "
                 f"{pdf_datei.name if pdf_datei else 'nicht erzeugt (Edge/Chrome nicht gefunden)'}\n"
             )
-            if pdf_datei:
-                erzeugte_pdfs.append(pdf_datei)
-
-        # Alle Klassen in derselben Reihenfolge zu einem fortlaufenden PDF verbinden.
-        gesamt_pdf = pdfs_zusammenfuehren(
-            erzeugte_pdfs, OUTPUT_DIR / "Alle_Klassen_5_bis_10.pdf"
-        )
-        if gesamt_pdf:
-            print(f"✓ Fortlaufendes Gesamt-PDF: {gesamt_pdf}")
-        elif erzeugte_pdfs:
-            print("Hinweis: Gesamt-PDF nicht erzeugt. Unter Kubuntu ggf. 'sudo apt install poppler-utils' ausführen.")
 
         print("=" * 60)
-        print("SchoolPublisher Version 2.4.1 erfolgreich beendet.")
+        print("SchoolPublisher Version 2.4.0 erfolgreich beendet.")
         print("=" * 60)
 
     except (FileNotFoundError, ValueError, OSError, ImportError) as fehler:

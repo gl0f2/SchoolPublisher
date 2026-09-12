@@ -482,18 +482,6 @@ class ElternabendHtmlRenderer:
         ):
             return "IMP"
 
-        # NIT und NwT getrennt behandeln. NIT enthält ebenfalls
-        # „Naturwissenschaft“ und „Technik“ und muss daher zuerst geprüft werden.
-        if (
-            normalisiert == "nit"
-            or (
-                "naturwissenschaft" in normalisiert
-                and "informatik" in normalisiert
-                and "technik" in normalisiert
-            )
-        ):
-            return "NIT"
-
         if (
             normalisiert == "nwt"
             or (

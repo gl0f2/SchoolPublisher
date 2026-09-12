@@ -104,24 +104,9 @@ class SchoolmanagerImporter:
             if not isinstance(lesson, dict):
                 continue
 
-            # SchoolPublisher bildet die reguläre Unterrichtsverteilung ab.
-            # Vertretungen/Änderungen (changedLesson) dürfen deshalb keine
-            # zusätzlichen Fachlehrkräfte auf den Karteikarten erzeugen.
-            if lesson.get("type") != "regularLesson":
-                continue
-
             actual = lesson.get("actualLesson")
             if not isinstance(actual, dict):
                 continue
-
-            # In Klassen 10 sind die 7. und 8. Stunde für das Blatt nicht relevant.
-            if klasse.startswith("10"):
-                nummer = (lesson.get("classHour") or {}).get("number")
-                try:
-                    if int(nummer) in {7, 8}:
-                        continue
-                except (TypeError, ValueError):
-                    pass
 
             subject = actual.get("subject") or {}
             fach = self._subject_code(subject)
@@ -130,7 +115,7 @@ class SchoolmanagerImporter:
                 continue
 
             # MPG-Sonderregeln für die Fachbezeichnungen im Stundenplan.
-            fach, fachname = self._fach_normalisieren(klasse, fach, fachname)
+            fach, fachname = self._fach_normalisieren(fach, fachname)
             if fach is None:
                 # z. B. Biologie-/Physik-Praktika: keine eigene Karteikarte.
                 continue
@@ -170,40 +155,21 @@ class SchoolmanagerImporter:
 
 
     @staticmethod
-    def _fach_normalisieren(klasse: str, fach: str, fachname: str) -> tuple[str | None, str]:
+    def _fach_normalisieren(fach: str, fachname: str) -> tuple[str | None, str]:
         code = fach.strip()
         name = fachname.strip()
         code_key = code.casefold().replace("–", "-").replace("—", "-").replace("‑", "-")
         text_key = f"{code} {name}".casefold()
-        stufe_text = "".join(z for z in klasse if z.isdigit())
-        stufe = int(stufe_text) if stufe_text else 0
 
-        # Klassen 8-10: SPO = Profilfach, SPO-M/SPO-W = regulärer Sport.
-        if 8 <= stufe <= 10:
-            if code_key == "spo":
-                return "SPO-PROFIL", "Sport (Profil)"
-            if code_key in {"spo-m", "spo-w"}:
-                return "SPO", "Sport"
+        # Sport in Klassen 8-10: SPO ist das Profilfach; SPO-M/SPO-W sind
+        # geschlechtergetrennte Gruppen desselben regulären Fachs Sport.
+        if code_key == "spo":
+            return "SPO-PROFIL", "Sport (Profil)"
+        if code_key in {"spo-m", "spo-w"}:
+            return "SPO", "Sport"
 
-        # In Klassen 5 und 6 wird das Schoolmanager-Fach NWT als NIT geführt.
-        # Dadurch greifen die vorhandenen NIT-Bewertungsregeln.
-        if stufe in {5, 6} and code_key == "nwt":
-            return "NIT", "NIT"
-
-        # Diese organisatorischen bzw. für SchoolPublisher irrelevanten Fächer
-        # sollen keine Karte erzeugen.
-        if (
-            "sternstunde" in text_key
-            or code_key in {"sternstunde", "klassenlehrer", "kl"}
-            or code_key == "mtw"
-            or code_key.startswith("mug-")
-        ):
-            return None, name
-
-        # Praktika in Biologie, Physik und Chemie werden nicht dargestellt.
-        if "prakt" in text_key and any(w in text_key for w in (
-            "bio", "biologie", "phys", "physik", "chem", "chemie"
-        )):
+        # Praktika in Biologie und Physik sollen keine eigenen Fachkarten erzeugen.
+        if "prakt" in text_key and ("bio" in text_key or "biologie" in text_key or "phys" in text_key or "physik" in text_key):
             return None, name
 
         return code, name

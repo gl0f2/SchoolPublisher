@@ -31,7 +31,7 @@ CLASS_ATTRIBUTES = [
 ]
 TEACHER_ATTRIBUTES = ["id", "firstname", "lastname", "abbreviation"]
 
-MANUELLE_DATEIEN = {"stellvertretende_klassenlehrer.json", "lehrkraefte_zusatz.json"}
+MANUELLE_DATEIEN = {"stellvertretende_klassenlehrer.json"}
 
 
 def week_range(monday: date) -> tuple[str, str]:

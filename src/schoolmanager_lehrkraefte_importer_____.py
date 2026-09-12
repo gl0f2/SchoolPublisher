@@ -29,17 +29,6 @@ class SchoolmanagerLehrkraefteImporter:
             lokal = {str(key).casefold(): value for key, value in lokal_roh.items()}
 
         zusatz = self._zusatz_laden()
-
-        # Nachnamen dürfen nur dann als Fallback für Zusatzdaten verwendet
-        # werden, wenn sie im Schoolmanager eindeutig sind. Die eigentliche
-        # Identität einer Lehrkraft ist immer das Kürzel.
-        nachnamen_anzahl: dict[str, int] = {}
-        for person in sm_lehrer:
-            if isinstance(person, dict):
-                nn = str(person.get("lastname") or "").strip().casefold()
-                if nn:
-                    nachnamen_anzahl[nn] = nachnamen_anzahl.get(nn, 0) + 1
-
         katalog: dict[str, Lehrkraft] = {}
 
         for eintrag in sm_lehrer:
@@ -56,15 +45,9 @@ class SchoolmanagerLehrkraefteImporter:
             vorname = str(eintrag.get("firstname") or "").strip() or (alt.vorname if alt else "")
             nachname = str(eintrag.get("lastname") or "").strip() or (alt.nachname if alt else "")
 
-            # Zusatzdaten: Kürzel ist eindeutig und hat immer Vorrang.
-            # Ein Nachname wird nur als Fallback akzeptiert, wenn er im
-            # aktuellen Schoolmanager-Lehrerkatalog genau einmal vorkommt.
-            nachname_key = nachname.casefold() if nachname else ""
-            extra_nachname = (
-                zusatz.get(nachname_key, {})
-                if nachname_key and nachnamen_anzahl.get(nachname_key, 0) == 1
-                else {}
-            )
+            # Zusatzdaten dürfen wahlweise unter dem Kürzel oder dem Nachnamen
+            # abgelegt werden. Das Kürzel hat Vorrang, falls beides vorhanden ist.
+            extra_nachname = zusatz.get(nachname.casefold(), {}) if nachname else {}
             extra_kuerzel = zusatz.get(schluessel, {})
             extra = {**extra_nachname, **extra_kuerzel}
 
@@ -76,15 +59,6 @@ class SchoolmanagerLehrkraefteImporter:
                 email = str(alt.email).strip()
             if not email:
                 email = self._email_erzeugen(vorname, nachname)
-
-            # Bekannte Abweichungen vom normalen MPG-Mail-Schema.
-            # Kürzelbezogen, damit gleichnamige Lehrkräfte nie verwechselt werden.
-            email_ausnahmen = {
-                "burk": "c.burkhardt@mpg-nt.de",
-                "bkh": "tj.burkhard@mpg-nt.de",
-            }
-            if schluessel in email_ausnahmen:
-                email = email_ausnahmen[schluessel]
 
             foto = str(extra.get("foto") or "").strip()
             if not foto:

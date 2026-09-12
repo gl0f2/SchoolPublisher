@@ -482,18 +482,6 @@ class ElternabendHtmlRenderer:
         ):
             return "IMP"
 
-        # NIT und NwT getrennt behandeln. NIT enthält ebenfalls
-        # „Naturwissenschaft“ und „Technik“ und muss daher zuerst geprüft werden.
-        if (
-            normalisiert == "nit"
-            or (
-                "naturwissenschaft" in normalisiert
-                and "informatik" in normalisiert
-                and "technik" in normalisiert
-            )
-        ):
-            return "NIT"
-
         if (
             normalisiert == "nwt"
             or (
@@ -567,25 +555,10 @@ class ElternabendHtmlRenderer:
         kuerzel_liste = self._eindeutige_lehrkraefte(eintraege)
         lehrkraefte = [schule.lehrkraft(kuerzel) for kuerzel in kuerzel_liste]
         bilder_html = "\n".join(self._bild_html(lehrkraft) for lehrkraft in lehrkraefte)
-        # Nur der Hauptklassenlehrer (Position 1) erhält (KL) am Namen.
-        hauptklassenlehrer = (
-            klasse.klassenlehrer[0].strip().casefold()
-            if klasse.klassenlehrer else ""
-        )
-
-        def lehrername(lehrkraft: Lehrkraft) -> str:
-            name = lehrkraft.kurzer_name
-            if (
-                hauptklassenlehrer
-                and lehrkraft.kuerzel.strip().casefold() == hauptklassenlehrer
-            ):
-                name += " (KL)"
-            return escape(name)
-
         namen_html = (
-            " · ".join(lehrername(lehrkraft) for lehrkraft in lehrkraefte)
+            " · ".join(escape(lehrkraft.kurzer_name) for lehrkraft in lehrkraefte)
             if len(lehrkraefte) >= 3
-            else "<br>".join(lehrername(lehrkraft) for lehrkraft in lehrkraefte)
+            else "<br>".join(escape(lehrkraft.kurzer_name) for lehrkraft in lehrkraefte)
         )
         emails = [lehrkraft.email.strip() for lehrkraft in lehrkraefte if lehrkraft.email.strip()]
         email_html = " / ".join(escape(email) for email in emails) if emails else "E-Mail nicht hinterlegt"
@@ -603,7 +576,16 @@ class ElternabendHtmlRenderer:
         artikelklasse = " breite-karte" if breit else ""
         hauptklasse = " breit" if breit else ""
         anzahlklasse = f" count-{min(len(lehrkraefte), 5)}"
-        fachanzeige = fachname
+        # Nur der Hauptklassenlehrer (Position 1) erhält die Kennzeichnung (KL).
+        hauptklassenlehrer = (
+            klasse.klassenlehrer[0].strip().casefold()
+            if klasse.klassenlehrer else ""
+        )
+        ist_klassenlehrerfach = bool(hauptklassenlehrer) and any(
+            kuerzel.strip().casefold() == hauptklassenlehrer
+            for kuerzel in kuerzel_liste
+        )
+        fachanzeige = f"{fachname} (KL)" if ist_klassenlehrerfach else fachname
 
         if breit:
             return f"""
@@ -984,8 +966,17 @@ class ElternabendHtmlRenderer:
         self,
         lehrkraft: Lehrkraft,
     ) -> Path | None:
-        # Das Schoolmanager-Kürzel ist die eindeutige Identität.
-        # Bilder werden ausschließlich anhand des Kürzels gesucht.
+        # Bevorzugt den Dateinamen aus lehrer.xlsx.
+        if lehrkraft.foto:
+            dateipfad = (
+                self.image_dir
+                / lehrkraft.foto
+            )
+
+            if dateipfad.is_file():
+                return dateipfad
+
+        # Rückfall: Bild anhand des Kürzels suchen.
         for endung in self.BILD_ENDUNGEN:
             dateipfad = (
                 self.image_dir
