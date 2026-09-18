@@ -49,18 +49,16 @@ class BewertungenImporter:
                 + ", ".join(sorted(fehlende_spalten))
             )
 
-        regeln: dict[tuple[int, str, str], Bewertungsinfo] = {}
+        # Zuerst werden die vollständigen Standardregeln ("alle") eingelesen.
+        # Danach werden klassenspezifische Zeilen darauf angewendet.
+        # Leere Zellen in einer Klassenzeile bedeuten: Wert aus "alle" übernehmen.
+        standardregeln: dict[tuple[int, str], Bewertungsinfo] = {}
+        klassenzeilen: list[tuple[int, str, str, object, int]] = []
 
         for zeilennummer, zeile in tabelle.iterrows():
             excel_zeile = zeilennummer + 2
             stufe = self._stufe(zeile["Klassenstufe"], excel_zeile)
             klasse = self._text(zeile["Klasse"]).casefold()
-            # Klassenbezogene Ausnahmen dürfen in der Excel-Datei sowohl
-            # vollständig (z. B. "9f") als auch nur mit dem Klassenbuchstaben
-            # (z. B. "f") angegeben werden. Intern verwendet SchoolPublisher
-            # immer den vollständigen Klassennamen.
-            if klasse and klasse != "alle" and not any(ch.isdigit() for ch in klasse):
-                klasse = f"{stufe}{klasse}"
             fach = self._text(zeile["Fach"])
 
             if not fach and not klasse and stufe is None:
@@ -70,52 +68,131 @@ class BewertungenImporter:
                     f"Unvollständige Bewertungsregel in Excel-Zeile {excel_zeile}."
                 )
 
-            muendlich = self._positive_zahl(
-                zeile["Mündlich"], "Mündlich", excel_zeile, pflicht=False
-            )
-            schriftlich = self._positive_zahl(
-                zeile["Schriftlich"], "Schriftlich", excel_zeile, pflicht=False
-            )
+            if klasse != "alle" and len(klasse) == 1 and klasse.isalpha():
+                klasse = f"{stufe}{klasse}"
 
-            # Während der gemeinsamen Eingabephase dürfen Zeilen noch
-            # unvollständig sein. Erst vollständig gewichtete Regeln werden
-            # für die Ausgabe übernommen.
-            if muendlich is None or schriftlich is None:
-                continue
-            praktisch = self._positive_zahl(
-                zeile["Praktisch"], "Praktisch", excel_zeile, pflicht=False
-            )
-
-            erhebungen = tuple(
-                Leistungserhebung(bezeichnung=bezeichnung, anzahl=anzahl)
-                for bezeichnung, anzahl in (
-                    ("Klassenarbeiten", self._anzahl(zeile["Klassenarbeiten"], "Klassenarbeiten", excel_zeile)),
-                    ("Tests", self._anzahl(zeile["Tests"], "Tests", excel_zeile)),
-                    ("Projekte", self._anzahl(zeile["Projekte"], "Projekte", excel_zeile)),
-                    ("Praktische Arbeiten", self._anzahl(zeile["Praktische Arbeiten"], "Praktische Arbeiten", excel_zeile)),
-                    ("Sonstige", self._anzahl(zeile["Sonstige"], "Sonstige", excel_zeile)),
+            if klasse == "alle":
+                info = self._info_aus_zeile(
+                    zeile=zeile,
+                    excel_zeile=excel_zeile,
+                    basis=None,
+                    erlaube_vererbung=False,
                 )
-                if anzahl > 0
-            )
+                # Noch nicht ausgefüllte Standardzeilen bleiben während
+                # der Eingabephase erlaubt.
+                if info is not None:
+                    schluessel = (stufe, fach.casefold())
+                    if schluessel in standardregeln:
+                        raise ValueError(
+                            "Doppelte Bewertungsregel in Excel-Zeile "
+                            f"{excel_zeile}: Stufe {stufe}, Klasse alle, Fach {fach}."
+                        )
+                    standardregeln[schluessel] = info
+            else:
+                klassenzeilen.append((stufe, klasse, fach, zeile, excel_zeile))
 
-            schluessel = (stufe, klasse, fach.casefold())
+        regeln: dict[tuple[int, str, str], Bewertungsinfo] = {
+            (stufe, "alle", fach): info
+            for (stufe, fach), info in standardregeln.items()
+        }
+
+        for stufe, klasse, fach, zeile, excel_zeile in klassenzeilen:
+            fach_key = fach.casefold()
+            basis = standardregeln.get((stufe, fach_key))
+
+            info = self._info_aus_zeile(
+                zeile=zeile,
+                excel_zeile=excel_zeile,
+                basis=basis,
+                erlaube_vererbung=True,
+            )
+            if info is None:
+                continue
+
+            schluessel = (stufe, klasse, fach_key)
             if schluessel in regeln:
                 raise ValueError(
                     "Doppelte Bewertungsregel in Excel-Zeile "
                     f"{excel_zeile}: Stufe {stufe}, Klasse {klasse}, Fach {fach}."
                 )
+            regeln[schluessel] = info
 
-            regeln[schluessel] = Bewertungsinfo(
-                gewicht_muendlich=muendlich,
-                gewicht_schriftlich=schriftlich,
-                gewicht_praktisch=praktisch,
-                erhebungen=erhebungen,
-                zusatzinformation=self._text(zeile["Zusatzinformation"]),
+        return Bewertungskatalog(regeln=regeln)
+
+    def _info_aus_zeile(
+        self,
+        zeile,
+        excel_zeile: int,
+        basis: Bewertungsinfo | None,
+        erlaube_vererbung: bool,
+    ) -> Bewertungsinfo | None:
+        def zahl_oder_basis(spalte: str, basiswert: float | None) -> float | None:
+            wert = zeile[spalte]
+            if pd.isna(wert) or str(wert).strip() == "":
+                return basiswert if erlaube_vererbung else None
+            return self._positive_zahl(
+                wert, spalte, excel_zeile, pflicht=False
             )
 
-        # Eine noch nicht ausgefüllte Tabelle ist während der Eingabephase
-        # erlaubt. In diesem Fall zeigt der Renderer „Informationen folgen“.
-        return Bewertungskatalog(regeln=regeln)
+        muendlich = zahl_oder_basis(
+            "Mündlich",
+            basis.gewicht_muendlich if basis else None,
+        )
+        schriftlich = zahl_oder_basis(
+            "Schriftlich",
+            basis.gewicht_schriftlich if basis else None,
+        )
+        praktisch = zahl_oder_basis(
+            "Praktisch",
+            basis.gewicht_praktisch if basis else None,
+        )
+
+        if muendlich is None or schriftlich is None:
+            return None
+
+        basis_erhebungen = {
+            e.bezeichnung: e.anzahl
+            for e in (basis.erhebungen if basis else ())
+        }
+
+        erhebungen = []
+        for bezeichnung in (
+            "Klassenarbeiten",
+            "Tests",
+            "Projekte",
+            "Praktische Arbeiten",
+            "Sonstige",
+        ):
+            wert = zeile[bezeichnung]
+            if pd.isna(wert) or str(wert).strip() == "":
+                anzahl = (
+                    basis_erhebungen.get(bezeichnung, 0)
+                    if erlaube_vererbung
+                    else 0
+                )
+            else:
+                anzahl = self._anzahl(
+                    wert, bezeichnung, excel_zeile
+                )
+            if anzahl > 0:
+                erhebungen.append(
+                    Leistungserhebung(
+                        bezeichnung=bezeichnung,
+                        anzahl=anzahl,
+                    )
+                )
+
+        zusatz = self._text(zeile["Zusatzinformation"])
+        if not zusatz and erlaube_vererbung and basis is not None:
+            zusatz = basis.zusatzinformation
+
+        return Bewertungsinfo(
+            gewicht_muendlich=muendlich,
+            gewicht_schriftlich=schriftlich,
+            gewicht_praktisch=praktisch,
+            erhebungen=tuple(erhebungen),
+            zusatzinformation=zusatz,
+        )
 
     @staticmethod
     def _text(wert: object) -> str:
