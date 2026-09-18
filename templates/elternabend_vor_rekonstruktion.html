@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notentransparenzblatt - Klasse $KLASSE</title>
+<style>
+:root {
+  --navy:#062d61; --navy2:#004b8f; --ink:#0a2247; --muted:#51627a;
+  --line:#dce5ef; --paper:#ffffff; --soft:#f6f9fc; --gold:#f2b400;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#dde5ed;color:var(--ink);font-family:"Segoe UI",Arial,sans-serif}
+.page{width:297mm;height:210mm;margin:10px auto;background:var(--paper);overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 20px #0002}
+.hero{height:28mm;flex:0 0 28mm;display:grid;grid-template-columns:78mm 1fr 58mm;align-items:center;position:relative;background:#fff;border-bottom:1px solid #e6edf4}
+.logo-wrap{padding-left:7mm;height:100%;display:flex;align-items:center}
+.logo{max-width:69mm;max-height:23mm;object-fit:contain}
+.hero-title{text-align:center;padding-top:1mm}
+.hero-title h1{margin:0;font-size:23pt;line-height:1.05;font-weight:800;letter-spacing:.02em;color:#082c61;text-transform:uppercase}.hero-title h1 span{display:block;margin-top:2mm;font-size:.58em;font-weight:700;text-transform:none}
+.hero-title .schoolyear{margin-top:3mm;font-size:12pt;font-weight:700;color:#123d78;display:flex;align-items:center;justify-content:center;gap:3mm}
+.hero-title .schoolyear:before,.hero-title .schoolyear:after{content:"";width:25mm;height:.35mm;background:#3165a5}
+.hero-side{height:100%;color:#fff;background:linear-gradient(135deg,#07366d,#002652);clip-path:polygon(18% 0,100% 0,100% 100%,0 100%);display:flex;flex-direction:column;justify-content:center;padding-left:14mm;font-size:8.6pt;line-height:1.65}
+.hero-side strong{font-size:9.6pt}
+.info-strip{height:23mm;flex:0 0 23mm;margin:3mm 4mm 2.8mm;border:1px solid #d7e3ef;border-radius:2.2mm;background:linear-gradient(90deg,#f7fbff,#fff);display:flex;box-shadow:0 .8mm 2.5mm #062d6112}
+.info-item{display:flex;flex:1 1 0;gap:3mm;align-items:center;padding:3mm 5mm;position:relative}
+.info-item+ .info-item:before{content:"";position:absolute;left:0;top:4mm;bottom:4mm;width:.25mm;background:#cbd8e7}
+.info-icon{width:8mm;height:8mm;min-width:8mm;min-height:8mm;flex:0 0 8mm;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--navy);font-size:12pt;font-weight:700}
+.info-item:nth-child(2) .info-icon{background:var(--gold)}
+.info-copy h2{margin:0 0 .8mm;font-size:9pt}.info-copy p{margin:0;font-size:6.8pt;line-height:1.35;color:#263b58}
+.cards{min-height:0;flex:1 1 auto;padding:0 4mm 2.5mm;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-flow:dense;gap:2.6mm 3.2mm}
+.cards.grid-3{grid-template-rows:repeat(3,minmax(0,1fr))}.cards.grid-4{grid-template-rows:repeat(4,minmax(0,1fr));gap:2mm 3mm}.cards.grid-5{grid-template-rows:repeat(5,minmax(0,1fr));gap:1.6mm 2.4mm}
+.card{--accent:#1674d1;min-width:0;min-height:0;overflow:hidden;position:relative;border:1px solid #e0e7ef;border-top:1.1mm solid var(--accent);border-radius:2mm;background:#fff;box-shadow:0 1mm 2.5mm #062d6115;padding:2.2mm 2.2mm 1.7mm;display:flex;flex-direction:column}
+.card-head{height:8mm;display:flex;align-items:center;gap:2.2mm;flex:0 0 auto}.subject-icon{width:7.4mm;height:7.4mm;border-radius:1.6mm;display:flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-size:7.3pt;font-weight:800;box-shadow:inset 0 .5mm 1mm #fff4}.subject{font-size:9pt;line-height:1.05;margin:0;font-weight:800;color:#071f46;overflow-wrap:anywhere}
+.card-main{display:grid;grid-template-columns:19mm 1fr;gap:2.2mm;min-height:0;flex:1 1 auto;margin-top:1.2mm}.card-main.mehrere{grid-template-columns:31mm 1fr}.photos{height:22mm;min-height:0;overflow:hidden;display:flex;align-items:flex-start}.lehrerbild{object-fit:cover !important;object-position:center 20% !important}.bildplatzhalter{display:flex;align-items:center;justify-content:center;font-size:7pt;font-weight:700;color:#315277}.teacher-photo,.photo-placeholder,.lehrerbild,.bildplatzhalter{width:18mm;height:22mm;border-radius:1.5mm;object-fit:cover;background:#e8edf2;box-shadow:0 .5mm 1.3mm #0002}.photos.multi{width:30mm;height:22mm;display:grid;grid-template-columns:repeat(2,14mm);grid-auto-rows:10.3mm;gap:1mm;align-content:start}.photos.multi .teacher-photo,.photos.multi .photo-placeholder,.photos.multi .lehrerbild,.photos.multi .bildplatzhalter{width:14mm;height:10.3mm;margin:0;border:0}.photos.count-2{grid-template-rows:22mm}.photos.count-2 .teacher-photo,.photos.count-2 .photo-placeholder,.photos.count-2 .lehrerbild,.photos.count-2 .bildplatzhalter{height:22mm}
+.details{min-width:0;font-size:6.3pt;line-height:1.22}.teacher{font-size:7.2pt;font-weight:800;margin:0 0 1.1mm;color:#101d35}.label{margin:.8mm 0 .4mm;color:var(--accent);font-weight:800}.ratio-name{margin:0}.ratio-grid{display:grid;align-items:center;text-align:center;column-gap:.7mm;row-gap:.25mm;margin:0;line-height:1.1}.ratio-grid.ratio-2{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}.ratio-grid.ratio-3{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr)}.ratio-heading{font-size:5.8pt;overflow-wrap:anywhere}.ratio-value{font-size:6.8pt;font-weight:800}.ratio-colon{font-weight:800}.assessments{margin-top:1mm}.assessment{display:flex;align-items:center;gap:1.2mm;margin:.7mm 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.additional-info{margin:.7mm 0 0;font-size:5.4pt;line-height:1.2;color:#51627a}.dot{width:3.2mm;height:3.2mm;border-radius:.8mm;display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-size:5pt;font-weight:bold;flex:0 0 auto}
+
+
+/* 4x3-Fortsetzung: immer letzter Rasterplatz unten rechts. */
+.continuation-card{
+  grid-column:4 !important;
+  grid-row:3 !important;
+  border-top-color:transparent;
+  box-shadow:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+}
+.continuation-inner{color:#0b4f86;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;width:100%}
+.continuation-arrow{font-size:18pt;line-height:1;margin-bottom:2mm}
+.continuation-title{font-size:11pt;font-weight:800;margin-bottom:1.2mm}
+.continuation-text{font-size:6pt;font-weight:700;line-height:1.25}
+
+.card.breite-karte{
+  grid-column:span 2;
+}
+.card-main.breit{
+  display:block;
+  margin-top:.8mm;
+}
+.card-main.breit .details{
+  width:100%;
+}
+
+.card.breite-karte .wide-header{
+  display:grid;
+  grid-template-columns:minmax(24mm,auto) 1fr;
+  gap:2mm;
+  align-items:center;
+  min-height:18mm;
+  margin-bottom:1mm;
+}
+.card.breite-karte .wide-subject{
+  display:flex;
+  align-items:center;
+  gap:2mm;
+  min-width:0;
+}
+.card.breite-karte .wide-subject .subject{
+  font-size:10pt;
+  white-space:normal;
+}
+.card.breite-karte .wide-teachers{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:1.8mm;
+}
+.card.breite-karte .wide-teachers .photos{
+  width:auto;
+  height:16mm;
+  display:flex;
+  gap:1mm;
+  overflow:visible;
+  flex:0 0 auto;
+}
+.card.breite-karte .wide-teachers .photos .teacher-photo,
+.card.breite-karte .wide-teachers .photos .photo-placeholder,
+.card.breite-karte .wide-teachers .photos .lehrerbild,
+.card.breite-karte .wide-teachers .photos .bildplatzhalter{
+  width:11mm;
+  height:16mm;
+  margin:0;
+  border:0;
+  flex:0 0 auto;
+}
+.card.breite-karte .wide-teachers .teacher{
+  margin:0;
+  max-width:42mm;
+  text-align:left;
+  font-size:5.7pt;
+  line-height:1.2;
+}
+.card-main.breit{
+  display:block;
+  margin-top:0;
+}
+.card-main.breit .details{
+  width:100%;
+}
+
+.wide-info-row{
+  display:grid;
+  grid-template-columns:1fr 1.35fr;
+  gap:1.2mm;
+}
+.wide-box{
+  border:1px dashed #b9cce3;
+  border-radius:1.2mm;
+  padding:1mm 1.3mm;
+  font-size:5.5pt;
+  line-height:1.2;
+}
+.wide-box strong{
+  color:var(--accent);
+  font-size:5.7pt;
+}
+.wide-additional{
+  margin-top:.8mm;
+  border:1px dashed #c7d5e5;
+  border-radius:1.2mm;
+  padding:.8mm 1.3mm;
+  font-size:5.1pt;
+  line-height:1.18;
+}
+.wide-additional strong{
+  color:var(--accent);
+}
+
+.email{flex:0 0 auto;border-top:1px solid #e1e8ef;margin-top:1.2mm;padding-top:1.1mm;font-size:6pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#183a69}.email:before{content:"✉";margin-right:1.2mm;color:var(--accent)}
+.grid-4 .card{padding:1.7mm 1.8mm 1.2mm}.grid-4 .card-head{height:6.5mm}.grid-4 .subject-icon{width:6mm;height:6mm;font-size:6pt}.grid-4 .subject{font-size:7.5pt}.grid-4 .card-main{grid-template-columns:15mm 1fr;gap:1.6mm;margin-top:.8mm}.grid-4 .teacher-photo,.grid-4 .photo-placeholder,.grid-4 .lehrerbild,.grid-4 .bildplatzhalter{width:14.5mm;height:17mm}.grid-4 .details{font-size:5.25pt}.grid-4 .teacher{font-size:6.2pt;margin-bottom:.5mm}.grid-4 .assessment{margin:.35mm 0}.grid-4 .email{font-size:5.1pt;margin-top:.6mm;padding-top:.6mm}
+.grid-5 .card{padding:1.2mm 1.4mm .8mm}.grid-5 .card-head{height:5.2mm;gap:1.2mm}.grid-5 .subject-icon{width:5mm;height:5mm;font-size:5pt}.grid-5 .subject{font-size:6.4pt}.grid-5 .card-main{grid-template-columns:12mm 1fr;gap:1mm;margin-top:.4mm}.grid-5 .teacher-photo,.grid-5 .photo-placeholder,.grid-5 .lehrerbild,.grid-5 .bildplatzhalter{width:11.5mm;height:14mm}.grid-5 .details{font-size:4.5pt}.grid-5 .teacher{font-size:5.3pt;margin-bottom:.3mm}.grid-5 .label{margin:.3mm 0 0}.grid-5 .assessment{margin:.15mm 0;gap:.7mm}.grid-5 .dot{width:2.4mm;height:2.4mm;font-size:4pt}.grid-5 .email{font-size:4.4pt;margin-top:.3mm;padding-top:.3mm}
+.footer{height:15mm;flex:0 0 15mm;background:linear-gradient(90deg,#052e63,#003d7d);color:#fff;display:grid;grid-template-columns:1fr 1.15fr .95fr;align-items:center;padding:0 8mm;font-size:6.3pt}.foot-block{height:9mm;display:flex;align-items:center;gap:3mm}.foot-block+ .foot-block{border-left:1px solid #ffffff55;padding-left:9mm}.heart,.globe{font-size:18pt}.footer strong{display:block;font-size:8pt;margin-bottom:.8mm}.qr{margin-left:auto;width:11mm;height:11mm;background:#fff;border-radius:1mm;padding:.7mm;object-fit:contain}
+.page + .page{margin-top:10mm}
+@media print{
+  html,body{
+    width:auto;
+    height:auto;
+    margin:0;
+    padding:0;
+    background:#fff
+  }
+  .page{
+    width:287mm;
+    height:200mm;
+    margin:0;
+    box-shadow:none;
+    break-after:page;
+    page-break-after:always
+  }
+  .page + .page{margin-top:0}
+  .page:last-child{
+    break-after:auto;
+    page-break-after:auto
+  }
+      .cards {
+        padding-bottom: 4mm;
+    }
+
+    .footer {
+        height: 13mm;
+        flex-basis: 13mm;
+    }
+
+    .info-strip {
+        margin-top: 2mm;
+        margin-bottom: 2mm;
+    }
+
+  .card.breite-karte{
+    break-inside:avoid;
+    page-break-inside:avoid;
+  }
+
+  @page{size:A4 landscape;margin:5mm}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+$SEITEN
+</body>
+</html>
