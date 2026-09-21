@@ -255,6 +255,31 @@ class ElternabendHtmlRenderer:
 
         for fachname in sortierte_fachnamen:
             eintraege = fachgruppen[fachname]
+
+            # In der Musik- und Theaterwerkstatt (MTW) wählen die Schülerinnen
+            # und Schüler zwischen Angeboten verschiedener Lehrkräfte.
+            # Deshalb werden in allen 5. Klassen alle fünf MTW-Lehrkräfte angezeigt.
+            if (
+                klassenname.strip().casefold().startswith("5")
+                and fachname.strip().casefold() == "musik- und theaterwerkstatt"
+            ):
+                mtw_lehrkraefte = ["AIß", "BURK", "KLP", "LUZ", "SCHÜ"]
+
+                mtw_vorlage = eintraege[0]
+
+                eintraege = [
+                    Unterricht(
+                        klasse=mtw_vorlage.klasse,
+                        fach=mtw_vorlage.fach,
+                        fachname=mtw_vorlage.fachname,
+                        lehrer=kuerzel,
+                        wochenstunden=mtw_vorlage.wochenstunden,
+                        stundenplan_name=mtw_vorlage.stundenplan_name,
+                        kopplung=mtw_vorlage.kopplung,
+                    )
+                    for kuerzel in mtw_lehrkraefte
+                ]
+
             anzahl_lehrkraefte = len(
                 self._eindeutige_lehrkraefte(eintraege)
             )
@@ -652,12 +677,28 @@ class ElternabendHtmlRenderer:
         email_html = " / ".join(escape(email) for email in emails) if emails else "E-Mail nicht hinterlegt"
         bewertungs_fachname = self._bewertungs_fachname(fachname)
         bewertung = schule.bewertung_fuer_fach(bewertungs_fachname, klasse.name)
-        breit = len(lehrkraefte) >= 3 or breite_erzwungen
-        bewertung_html = (
-            self._bewertung_breit_html(bewertung)
-            if breit
-            else self._bewertung_html(bewertung)
+
+        # Diese Unterrichtsangebote werden nicht benotet.
+        fach_key = fachname.strip().casefold()
+        ohne_bewertung = (
+            fach_key == "sternstunde"
+            or fach_key == "sternstunde/mentoring"
+            or fach_key == "musik- und theaterwerkstatt"
         )
+
+        breit = len(lehrkraefte) >= 3 or breite_erzwungen
+
+        if ohne_bewertung:
+            bewertung_html = (
+                '<p class="label">Leistungsbewertung</p>'
+                '<p class="ratio-name">Unterrichtsfach ohne eigene Bewertung</p>'
+            )
+        else:
+            bewertung_html = (
+                self._bewertung_breit_html(bewertung)
+                if breit
+                else self._bewertung_html(bewertung)
+            )        
         accent, icon = self._fach_design(fachname)
         multi = " multi" if len(lehrkraefte) > 1 else ""
         mehrfach = " mehrere" if len(lehrkraefte) > 1 else ""
@@ -665,14 +706,67 @@ class ElternabendHtmlRenderer:
         hauptklasse = " breit" if breit else ""
         anzahlklasse = f" count-{min(len(lehrkraefte), 5)}"
         fachanzeige = f"{fachname} (KL)" if ist_hauptklassenlehrer_fach else fachname
+        # Eigene Darstellung für MTW:
+        # fünf Lehrkräfte, aber keine Bewertungsinformationen.
+        if fach_key == "musik- und theaterwerkstatt":
+            personen_html = "".join(
+                f"""
+                <div style="
+                    flex:1;
+                    min-width:0;
+                    text-align:center;
+                ">
+                    {self._bild_html(lehrkraft)}
+                    <div style="
+                        font-size:6.2pt;
+                        font-weight:600;
+                        line-height:1.05;
+                        margin-top:1mm;
+                    ">
+                        {lehrername(lehrkraft)}
+                    </div>
+                </div>
+                """
+                for lehrkraft in lehrkraefte
+            )
 
+            return f"""
+            <article class="card breite-karte" style="--accent:{accent}">
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    gap:2mm;
+                    margin-bottom:2mm;
+                ">
+                    <div class="subject-icon">{escape(icon)}</div>
+                    <h3 class="subject" style="
+                        margin:0;
+                        text-align:center;
+                        white-space:normal;
+                    ">
+                        {escape(fachname)} <span style="font-weight:500;">(ohne Bewertung)</span>
+                    </h3>
+                </div>
+
+                <div style="
+                    display:flex;
+                    align-items:flex-start;
+                    justify-content:space-between;
+                    gap:2mm;
+                    width:100%;
+                ">
+                    {personen_html}
+                </div>
+            </article>
+            """
         if breit:
             return f"""
             <article class="card{artikelklasse}" style="--accent:{accent}">
                 <div class="wide-header">
                     <div class="wide-subject">
                         <div class="subject-icon">{escape(icon)}</div>
-                        <h3 class="subject">{escape(fachanzeige)}</h3>
+                        <h3 class="subject">{escape(fachname)} <span style="font-weight:500;">(ohne Bewertung)</span></h3>
                     </div>
                     <div class="wide-teachers">
                         <div class="photos{multi}{anzahlklasse}">{bilder_html}</div>

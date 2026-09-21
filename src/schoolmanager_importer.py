@@ -81,6 +81,8 @@ class SchoolmanagerImporter:
                     )
                 )
 
+        unterrichtsliste = self._manuelle_lehrerwechsel_anwenden(unterrichtsliste)
+
         return sorted(
             unterrichtsliste,
             key=lambda e: (
@@ -89,6 +91,64 @@ class SchoolmanagerImporter:
                 e.lehrer.casefold(),
             ),
         )
+
+    def _manuelle_lehrerwechsel_anwenden(
+        self, unterrichtsliste: list[Unterricht]
+    ) -> list[Unterricht]:
+        """Wendet lokale Lehrerwechsel nach dem Schoolmanager-Import an.
+
+        Die Datei ``manuelle_aenderungen.json`` bleibt unabhängig von den
+        automatisch aktualisierten A/B-Stundenplandaten erhalten.
+        """
+        pfad = self.datenverzeichnis / "manuelle_aenderungen.json"
+        if not pfad.is_file():
+            return unterrichtsliste
+
+        with pfad.open("r", encoding="utf-8") as f:
+            daten = json.load(f)
+
+        wechsel = daten.get("lehrerwechsel", []) if isinstance(daten, dict) else []
+        if not isinstance(wechsel, list):
+            raise ValueError(f"'lehrerwechsel' muss eine Liste sein: {pfad}")
+
+        ergebnis = list(unterrichtsliste)
+        for eintrag in wechsel:
+            if not isinstance(eintrag, dict):
+                continue
+            klasse = str(eintrag.get("klasse") or "").strip()
+            fach = str(eintrag.get("fach") or "").strip().casefold()
+            lehrer = str(eintrag.get("lehrer") or "").strip()
+            if not klasse or not fach or not lehrer:
+                raise ValueError(f"Unvollständiger Lehrerwechsel in {pfad}: {eintrag}")
+
+            treffer = []
+            for i, u in enumerate(ergebnis):
+                fachwerte = {u.fach.strip().casefold(), u.fachname.strip().casefold()}
+                if u.klasse.casefold() == klasse.casefold() and fach in fachwerte:
+                    treffer.append(i)
+
+            if not treffer:
+                raise ValueError(
+                    f"Manueller Lehrerwechsel nicht gefunden: {klasse} / {eintrag.get('fach')}"
+                )
+
+            # Ein Lehrerwechsel ersetzt alle bisher aus Schoolmanager gelesenen
+            # Lehrkräfte für genau diese Klasse/Fach-Kombination. Bei mehreren
+            # alten Einträgen wird nur ein Unterrichtsobjekt übernommen.
+            basis = ergebnis[treffer[0]]
+            neu = Unterricht(
+                klasse=basis.klasse,
+                fach=basis.fach,
+                fachname=basis.fachname,
+                lehrer=lehrer,
+                wochenstunden=basis.wochenstunden,
+                stundenplan_name=basis.stundenplan_name,
+                kopplung=basis.kopplung,
+            )
+            ergebnis = [u for i, u in enumerate(ergebnis) if i not in set(treffer)]
+            ergebnis.append(neu)
+
+        return ergebnis
 
     def _woche_auswerten(self, klasse: str, lessons: list) -> dict:
         """
@@ -185,20 +245,25 @@ class SchoolmanagerImporter:
             if code_key in {"spo-m", "spo-w"}:
                 return "SPO", "Sport"
 
-        # In Klassen 5 und 6 wird das Schoolmanager-Fach NWT als NIT geführt.
-        # Dadurch greifen die vorhandenen NIT-Bewertungsregeln.
-        if stufe in {5, 6} and code_key == "nwt":
-            return "NIT", "NIT"
-
-        # Diese organisatorischen bzw. für SchoolPublisher irrelevanten Fächer
-        # sollen keine Karte erzeugen.
+        # Klassenlehrerstunden und Gesangsklassen erzeugen keine eigene Karte.
+        # Sternstunde und MTW werden dagegen für die Elternabendübersicht benötigt.
         if (
-            "sternstunde" in text_key
-            or code_key in {"sternstunde", "klassenlehrer", "kl"}
-            or code_key == "mtw"
+            code_key in {"klassenlehrer", "kl"}
             or code_key.startswith("mug-")
         ):
             return None, name
+
+        # Sternstunde:
+        # Klasse 6 -> "Sternstunde"
+        # Klasse 7 -> "Sternstunde/Mentoring"
+        if "sternstunde" in text_key or code_key in {"stern", "sternstunde"}:
+            if stufe == 7:
+                return "Stern", "Sternstunde/Mentoring"
+            return "Stern", "Sternstunde"
+
+        # MTW wird in Klasse 5 als eigene Karte angezeigt.
+        if code_key == "mtw":
+            return "MTW", "Musik- und Theaterwerkstatt"
 
         # Praktika in Biologie, Physik und Chemie werden nicht dargestellt.
         if "prakt" in text_key and any(w in text_key for w in (
