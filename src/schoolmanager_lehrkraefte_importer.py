@@ -68,6 +68,10 @@ class SchoolmanagerLehrkraefteImporter:
             extra_kuerzel = zusatz.get(schluessel, {})
             extra = {**extra_nachname, **extra_kuerzel}
 
+            # Manuelle Namenskorrekturen aus lehrkraefte_zusatz.json anwenden.
+            vorname = str(extra.get("vorname") or "").strip() or vorname
+            nachname = str(extra.get("nachname") or "").strip() or nachname
+
             anrede = str(extra.get("anrede") or "").strip() or (alt.anrede if alt else "")
 
             # Priorität: JSON-Ausnahme -> lehrer.xlsx -> automatisch erzeugt.

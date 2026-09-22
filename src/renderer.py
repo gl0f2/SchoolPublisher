@@ -276,6 +276,7 @@ class ElternabendHtmlRenderer:
                         wochenstunden=mtw_vorlage.wochenstunden,
                         stundenplan_name=mtw_vorlage.stundenplan_name,
                         kopplung=mtw_vorlage.kopplung,
+                        halbjahr=None,
                     )
                     for kuerzel in mtw_lehrkraefte
                 ]
@@ -649,6 +650,14 @@ class ElternabendHtmlRenderer:
         breite_erzwungen: bool = False,
         kompakter_kopf: bool = False,
     ) -> str:
+        eintraege = sorted(
+            eintraege,
+            key=lambda e: (
+                e.halbjahr is None,
+                e.halbjahr if e.halbjahr is not None else 99,
+                e.lehrer.casefold(),
+            ),
+        )
         kuerzel_liste = self._eindeutige_lehrkraefte(eintraege)
         lehrkraefte = [schule.lehrkraft(kuerzel) for kuerzel in kuerzel_liste]
         bilder_html = "\n".join(self._bild_html(lehrkraft) for lehrkraft in lehrkraefte)
@@ -658,8 +667,28 @@ class ElternabendHtmlRenderer:
             if klasse.klassenlehrer else ""
         )
 
+        halbjahre_pro_lehrer: dict[str, set[int]] = {}
+        for eintrag in eintraege:
+            if eintrag.halbjahr in {1, 2}:
+                halbjahre_pro_lehrer.setdefault(eintrag.lehrer.strip().casefold(), set()).add(eintrag.halbjahr)
+
         def lehrername(lehrkraft: Lehrkraft) -> str:
-            return escape(lehrkraft.kurzer_name)
+            name = lehrkraft.kurzer_name
+
+            halbjahr = next(
+                (
+                    e.halbjahr
+                    for e in eintraege
+                    if e.lehrer.strip().casefold()
+                    == lehrkraft.kuerzel.strip().casefold()
+                ),
+                None,
+            )
+
+            if halbjahr in (1, 2):
+                name += f" ({halbjahr}. HJ)"
+
+            return escape(name)
 
         # (KL) erscheint nur auf der Fachkarte, wenn der Hauptklassenlehrer
         # dieses Fach in der Klasse tatsächlich unterrichtet.
@@ -684,6 +713,7 @@ class ElternabendHtmlRenderer:
             fach_key == "sternstunde"
             or fach_key == "sternstunde/mentoring"
             or fach_key == "musik- und theaterwerkstatt"
+            or fach_key == "nit"
         )
 
         breit = len(lehrkraefte) >= 3 or breite_erzwungen
@@ -712,16 +742,34 @@ class ElternabendHtmlRenderer:
             personen_html = "".join(
                 f"""
                 <div style="
-                    flex:1;
-                    min-width:0;
+                    display:grid;
+                    grid-template-rows: 23mm 7mm;
+                    align-items:start;
+                    justify-items:center;
                     text-align:center;
+                    min-width:0;
                 ">
-                    {self._bild_html(lehrkraft)}
                     <div style="
+                        width:100%;
+                        height:23mm;
+                        display:flex;
+                        align-items:flex-start;
+                        justify-content:center;
+                    ">
+                        {self._bild_html(lehrkraft)}
+                    </div>
+
+                    <div style="
+                        width:100%;
+                        height:7mm;
+                        display:flex;
+                        align-items:flex-start;
+                        justify-content:center;
                         font-size:6.2pt;
                         font-weight:600;
                         line-height:1.05;
-                        margin-top:1mm;
+                        padding-top:1mm;
+                        box-sizing:border-box;
                     ">
                         {lehrername(lehrkraft)}
                     </div>
@@ -750,11 +798,11 @@ class ElternabendHtmlRenderer:
                 </div>
 
                 <div style="
-                    display:flex;
-                    align-items:flex-start;
-                    justify-content:space-between;
-                    gap:2mm;
+                    display:grid;
+                    grid-template-columns:repeat(5, 1fr);
+                    column-gap:2mm;
                     width:100%;
+                    align-items:start;
                 ">
                     {personen_html}
                 </div>
@@ -1090,10 +1138,7 @@ class ElternabendHtmlRenderer:
                     wert,
                 )
 
-        return sorted(
-            kuerzel.values(),
-            key=str.casefold,
-        )
+        return list(kuerzel.values())
 
     @staticmethod
     def _wochenstunden_gruppe_text(

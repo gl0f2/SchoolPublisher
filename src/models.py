@@ -95,6 +95,8 @@ class Unterricht:
     wochenstunden: float
     stundenplan_name: str = ""
     kopplung: str | None = None
+    halbjahr: int | None = None
+
     @property
     def anzeigename(self) -> str:
         return self.fachname.strip() or self.stundenplan_name.strip() or self.fach.strip()

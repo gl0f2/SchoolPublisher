@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from pathlib import Path
+import re
+
+from openpyxl import load_workbook
 
 from models import Unterricht
 
@@ -82,6 +85,7 @@ class SchoolmanagerImporter:
                 )
 
         unterrichtsliste = self._manuelle_lehrerwechsel_anwenden(unterrichtsliste)
+        unterrichtsliste = self._halbjahresdaten_anwenden(unterrichtsliste)
 
         return sorted(
             unterrichtsliste,
@@ -91,6 +95,138 @@ class SchoolmanagerImporter:
                 e.lehrer.casefold(),
             ),
         )
+
+
+    def _halbjahresdaten_anwenden(
+        self, unterrichtsliste: list[Unterricht]
+    ) -> list[Unterricht]:
+        """Ergänzt 1./2.-Halbjahresunterricht aus ``Daten JND.xlsx``.
+
+        Schoolmanager bleibt die Hauptquelle. Die Exceldatei liefert nur die
+        Halbjahreszuordnung und ggf. eine Lehrkraft des zweiten Halbjahres,
+        die im aktuellen September-Stundenplan noch nicht vorkommt.
+        """
+        projektwurzel = self.datenverzeichnis.parent.parent
+        pfad = projektwurzel / "Daten JND.xlsx"
+        if not pfad.is_file():
+            return unterrichtsliste
+
+        wb = load_workbook(pfad, data_only=True)
+        ws = wb.active
+        halbjahreszeilen: list[dict] = []
+
+        try:
+            for zeile in range(5, ws.max_row + 1):
+                lehrer = str(ws.cell(zeile, 5).value or "").strip()
+                fach = str(ws.cell(zeile, 6).value or "").strip()
+                klassenwert = str(ws.cell(zeile, 7).value or "").strip()
+                wst_wert = ws.cell(zeile, 4).value
+
+                marker = {
+                    str(ws.cell(zeile, 13).value or "").strip().casefold(),
+                    str(ws.cell(zeile, 14).value or "").strip().casefold(),
+                }
+                if "1.hj" in marker:
+                    hj = 1
+                elif "2.hj" in marker:
+                    hj = 2
+                else:
+                    continue
+
+                if not fach or not lehrer:
+                    continue
+
+                fach_key = fach.casefold().replace("–", "-").replace("—", "-").replace("‑", "-")
+                if (
+                    fach_key in {"kl", "kl2", "ch-pr", "b-pr", "ph-pr"}
+                    or fach_key.startswith("mug-")
+                    or fach_key.startswith("spj")
+                ):
+                    continue
+
+                try:
+                    wst = float(str(wst_wert).replace(",", ".")) if wst_wert not in (None, "") else 0.0
+                except (TypeError, ValueError):
+                    wst = 0.0
+
+                for teil in klassenwert.split(","):
+                    klasse = teil.strip().lower()
+                    if not re.fullmatch(r"(?:5|6|7|8|9|10)[a-f]", klasse):
+                        continue
+
+                    fach_norm, fachname = self._fach_normalisieren(klasse, fach, self._fachname_fuer_excelcode(fach))
+                    if fach_norm is None:
+                        continue
+
+                    halbjahreszeilen.append({
+                        "klasse": klasse,
+                        "fach": fach_norm,
+                        "fachname": fachname,
+                        "lehrer": lehrer,
+                        "halbjahr": hj,
+                        "wochenstunden": wst,
+                    })
+        finally:
+            wb.close()
+
+        # Doppelte Excelzeilen entfernen.
+        eindeutig: dict[tuple[str, str, str, int], dict] = {}
+        for e in halbjahreszeilen:
+            key = (e["klasse"].casefold(), e["fach"].casefold(), e["lehrer"].casefold(), e["halbjahr"])
+            eindeutig[key] = e
+        halbjahreszeilen = list(eindeutig.values())
+
+        # Derselbe Lehrer in beiden Halbjahren = ganzjährig.
+        hj_pro_lehrer: dict[tuple[str, str, str], set[int]] = defaultdict(set)
+        for e in halbjahreszeilen:
+            hj_pro_lehrer[(e["klasse"].casefold(), e["fach"].casefold(), e["lehrer"].casefold())].add(e["halbjahr"])
+
+        excel_faecher = {(e["klasse"].casefold(), e["fach"].casefold()) for e in halbjahreszeilen}
+
+        # Für Fächer mit Halbjahresangaben ersetzt die Excel-Zuordnung die
+        # aktuelle Lehrerzuordnung dieses Faches. Alle anderen Fächer bleiben
+        # unverändert aus Schoolmanager erhalten.
+        basis_pro_fach: dict[tuple[str, str], Unterricht] = {}
+        ergebnis: list[Unterricht] = []
+        for u in unterrichtsliste:
+            key = (u.klasse.casefold(), u.fach.casefold())
+            basis_pro_fach.setdefault(key, u)
+            if key not in excel_faecher:
+                ergebnis.append(u)
+
+        for e in halbjahreszeilen:
+            lehrer_key = (e["klasse"].casefold(), e["fach"].casefold(), e["lehrer"].casefold())
+            # Wenn beide Halbjahre denselben Lehrer nennen, nur einmal ganzjährig erzeugen.
+            if hj_pro_lehrer[lehrer_key] == {1, 2} and e["halbjahr"] == 2:
+                continue
+            hj = None if hj_pro_lehrer[lehrer_key] == {1, 2} else e["halbjahr"]
+
+            basis = basis_pro_fach.get((e["klasse"].casefold(), e["fach"].casefold()))
+            ergebnis.append(Unterricht(
+                klasse=basis.klasse if basis else e["klasse"],
+                fach=basis.fach if basis else e["fach"],
+                fachname=basis.fachname if basis else e["fachname"],
+                lehrer=e["lehrer"],
+                wochenstunden=(basis.wochenstunden if basis and basis.wochenstunden > 0 else e["wochenstunden"]),
+                stundenplan_name=basis.stundenplan_name if basis else e["fachname"],
+                kopplung=basis.kopplung if basis else None,
+                halbjahr=hj,
+            ))
+
+        return ergebnis
+
+    @staticmethod
+    def _fachname_fuer_excelcode(fach: str) -> str:
+        """Lesbarer Fachname für Halbjahresfächer, die im aktuellen Plan fehlen."""
+        key = fach.strip().casefold()
+        namen = {
+            "d": "Deutsch", "m": "Mathematik", "e": "Englisch",
+            "b": "Biologie", "bk": "Bildende Kunst", "mu": "Musik",
+            "gk": "Gemeinschaftskunde", "geo": "Geographie", "wbs": "WBS",
+            "ium": "Informatik und Medienbildung", "nit": "NIT",
+            "stern": "Sternstunde",
+        }
+        return namen.get(key, fach.strip())
 
     def _manuelle_lehrerwechsel_anwenden(
         self, unterrichtsliste: list[Unterricht]
